@@ -1,0 +1,123 @@
+/* Mystical gradient backgrounds */
+.mystical-gradient {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.mystical-gradient-subtle {
+  background: linear-gradient(135deg, #f5f3ff 0%, #fef3c7 100%);
+}
+
+/* Card enhancements */
+.tarot-card {
+  position: relative;
+  background: white;
+  border: 1px solid rgba(139, 92, 246, 0.1);
+  box-shadow:
+    0 1px 3px 0 rgba(139, 92, 246, 0.05),
+    0 10px 15px -3px rgba(139, 92, 246, 0.05),
+    0 4px 6px -2px rgba(139, 92, 246, 0.03);
+  transition: all 0.3s ease;
+}
+
+.tarot-card:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 4px 6px -1px rgba(139, 92, 246, 0.1),
+    0 20px 25px -5px rgba(139, 92, 246, 0.1),
+    0 10px 10px -5px rgba(139, 92, 246, 0.04);
+  border-color: rgba(139, 92, 246, 0.2);
+}
+
+/* Mystical glow effect */
+.mystical-glow {
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
+}
+
+/* Animated gradient text */
+.gradient-text {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f59e0b 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  background-size: 200% 200%;
+  animation: gradient-shift 3s ease infinite;
+}
+
+@keyframes gradient-shift {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+/* Star sparkle animation */
+.sparkle {
+  animation: sparkle 2s ease-in-out infinite;
+}
+
+@keyframes sparkle {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.1);
+  }
+}
+
+/* Floating animation */
+.float {
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+/* Enhanced navigation */
+.nav-blur {
+  backdrop-filter: blur(12px);
+  background: rgba(255, 255, 255, 0.8);
+  border-bottom: 1px solid rgba(139, 92, 246, 0.1);
+}
+
+.dark .nav-blur {
+  background: rgba(26, 22, 37, 0.8);
+  border-bottom: 1px solid rgba(167, 139, 250, 0.2);
+}
+
+/* Category icons with gradient backgrounds */
+.category-icon-relationships {
+  background: linear-gradient(135deg, #ec4899 0%, #f472b6 100%);
+}
+
+.category-icon-career {
+  background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);
+}
+
+.category-icon-health {
+  background: linear-gradient(135deg, #10b981 0%, #34d399 100%);
+}
+
+/* Free reading badge */
+.free-badge {
+  background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(245, 158, 11, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(245, 158, 11, 0.7);
+  }
+}

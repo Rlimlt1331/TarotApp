@@ -28,41 +28,41 @@ export function MyReadings() {
   };
 
   return (
-    <div className="min-h-screen p-6">
-      <div className="max-w-4xl mx-auto space-y-6">
-        <div className="text-center space-y-2">
-          <h1 className="text-4xl flex items-center justify-center gap-2">
-            <Star className="size-8" />
+    <div className="min-h-screen p-6 mystical-gradient-subtle">
+      <div className="max-w-4xl mx-auto space-y-8">
+        <div className="text-center space-y-4 py-8">
+          <h1 className="text-5xl flex items-center justify-center gap-3 gradient-text">
+            <Star className="size-10 sparkle text-purple-600" />
             My Readings
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-lg text-muted-foreground">
             View your tarot reading history and insights
           </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card>
+          <Card className="tarot-card bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950 dark:to-purple-900 border-purple-200">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm">Total Requests</CardTitle>
+              <CardTitle className="text-sm text-purple-900 dark:text-purple-100">Total Requests</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl">{myRequests.length}</div>
+              <div className="text-4xl font-bold text-purple-600">{myRequests.length}</div>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="tarot-card bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900 border-green-200">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm">Completed</CardTitle>
+              <CardTitle className="text-sm text-green-900 dark:text-green-100">Completed</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl">{myReadings.length}</div>
+              <div className="text-4xl font-bold text-green-600">{myReadings.length}</div>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="tarot-card bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-950 dark:to-amber-900 border-amber-200">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm">Pending</CardTitle>
+              <CardTitle className="text-sm text-amber-900 dark:text-amber-100">Pending</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl">
+              <div className="text-4xl font-bold text-amber-600">
                 {myRequests.filter(r => r.status !== 'completed').length}
               </div>
             </CardContent>
@@ -83,7 +83,7 @@ export function MyReadings() {
               if (!request) return null;
 
               return (
-                <Card key={reading.id} className="hover:shadow-md transition-shadow">
+                <Card key={reading.id} className="tarot-card">
                   <CardHeader>
                     <div className="flex items-start justify-between">
                       <div className="space-y-1">

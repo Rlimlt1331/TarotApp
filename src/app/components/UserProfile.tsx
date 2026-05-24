@@ -41,8 +41,8 @@ export function UserProfile({ onComplete }: { onComplete: () => void }) {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6">
-      <Card className="w-full max-w-2xl">
+    <div className="min-h-screen flex items-center justify-center p-6 mystical-gradient-subtle">
+      <Card className="w-full max-w-2xl tarot-card shadow-xl">
         <CardHeader>
           <CardTitle>Complete Your Profile</CardTitle>
           <CardDescription>
@@ -111,8 +111,8 @@ export function UserProfile({ onComplete }: { onComplete: () => void }) {
             <div className="space-y-2">
               <Label>Gender *</Label>
               <RadioGroup value={gender} onValueChange={(value) => setGender(value as Gender)}>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {(['male', 'female', 'non-binary', 'prefer-not-to-say'] as Gender[]).map((g) => (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {(['male', 'female', 'prefer-not-to-say'] as Gender[]).map((g) => (
                     <Label
                       key={g}
                       htmlFor={g}

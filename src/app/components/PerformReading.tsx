@@ -164,14 +164,14 @@ The cards encourage you to trust your intuition and take inspired action. The un
   };
 
   return (
-    <div className="min-h-screen p-6">
-      <div className="max-w-4xl mx-auto space-y-6">
+    <div className="min-h-screen p-6 mystical-gradient-subtle">
+      <div className="max-w-4xl mx-auto space-y-8">
         <Button variant="ghost" onClick={onBack} className="mb-4">
           <ArrowLeft className="size-4 mr-2" />
           Back to Dashboard
         </Button>
 
-        <Card>
+        <Card className="tarot-card">
           <CardHeader>
             <CardTitle>Reading for {request.userName}</CardTitle>
             <CardDescription>
@@ -181,7 +181,7 @@ The cards encourage you to trust your intuition and take inspired action. The un
           </CardHeader>
         </Card>
 
-        <Card>
+        <Card className="tarot-card">
           <CardHeader>
             <CardTitle>1. Select Cards</CardTitle>
             <CardDescription>
@@ -219,7 +219,7 @@ The cards encourage you to trust your intuition and take inspired action. The un
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="tarot-card">
           <CardHeader>
             <CardTitle>2. Upload Card Spread Image (Optional)</CardTitle>
             <CardDescription>
@@ -239,7 +239,7 @@ The cards encourage you to trust your intuition and take inspired action. The un
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="tarot-card">
           <CardHeader>
             <CardTitle>3. Generate AI-Assisted Reading</CardTitle>
             <CardDescription>

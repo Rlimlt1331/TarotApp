@@ -25,13 +25,15 @@ export function Navigation({ onEditProfile }: { onEditProfile: () => void }) {
   ];
 
   return (
-    <nav className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
+    <nav className="nav-blur sticky top-0 z-50 shadow-sm">
       <div className="container mx-auto px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-6">
-            <Link to="/" className="flex items-center gap-2">
-              <Sparkles className="size-6 text-primary" />
-              <span className="text-xl">Mystic Tarot Portal</span>
+            <Link to="/" className="flex items-center gap-2 group">
+              <Sparkles className="size-6 text-primary sparkle" />
+              <span className="text-xl font-bold bg-gradient-to-r from-purple-600 to-purple-900 bg-clip-text text-transparent">
+                Mystic Tarot Portal
+              </span>
             </Link>
 
             <div className="hidden md:flex items-center gap-2">

@@ -7,6 +7,7 @@ import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Badge } from './ui/badge';
+import { Combobox } from './ui/combobox';
 import { useTarot } from '../context/TarotContext';
 import { HOROSCOPES, COUNTRIES, SUGGESTED_QUESTIONS } from '../data/mockData';
 import { ReadingCategory, Gender } from '../types';
@@ -21,6 +22,7 @@ export function RequesterPortal() {
   const [additionalNotes, setAdditionalNotes] = useState('');
   const [horoscope, setHoroscope] = useState(currentUser?.horoscope || '');
   const [gender, setGender] = useState<Gender | ''>(currentUser?.gender || '');
+  const [country, setCountry] = useState(currentUser?.country || '');
   const [occupation, setOccupation] = useState('');
 
   const categoryIcons = {
@@ -56,6 +58,11 @@ export function RequesterPortal() {
       return;
     }
 
+    if (!country) {
+      toast.error('Please select your country');
+      return;
+    }
+
     addRequest({
       userId: currentUser.id,
       userName: currentUser.name,
@@ -63,7 +70,7 @@ export function RequesterPortal() {
       question,
       userInfo: {
         horoscope: horoscope,
-        country: currentUser.country,
+        country: country,
         gender: gender as Gender,
         occupation: occupation || undefined,
         additionalNotes: additionalNotes || undefined,
@@ -79,25 +86,26 @@ export function RequesterPortal() {
   };
 
   return (
-    <div className="min-h-screen p-6">
-      <div className="max-w-4xl mx-auto space-y-6">
-        <div className="text-center space-y-2">
-          <h1 className="text-4xl flex items-center justify-center gap-2">
-            <Sparkles className="size-8" />
+    <div className="min-h-screen p-6 mystical-gradient-subtle">
+      <div className="max-w-4xl mx-auto space-y-8">
+        <div className="text-center space-y-4 py-8">
+          <h1 className="text-5xl flex items-center justify-center gap-3 gradient-text">
+            <Sparkles className="size-10 sparkle text-purple-600" />
             Request a Tarot Reading
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             Connect with experienced tarot readers for guidance on your life's journey
           </p>
           {isFreeReading && (
-            <Badge variant="secondary" className="text-lg px-4 py-1">
+            <Badge className="text-lg px-6 py-2 free-badge text-white border-0">
+              <Sparkles className="size-4 mr-2" />
               Your First Reading is FREE
             </Badge>
           )}
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          <Card>
+          <Card className="tarot-card">
             <CardHeader>
               <CardTitle>Your Horoscope Sign</CardTitle>
               <CardDescription>
@@ -120,7 +128,7 @@ export function RequesterPortal() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="tarot-card">
             <CardHeader>
               <CardTitle>Your Gender</CardTitle>
               <CardDescription>
@@ -129,8 +137,8 @@ export function RequesterPortal() {
             </CardHeader>
             <CardContent>
               <RadioGroup value={gender} onValueChange={(value) => setGender(value as Gender)}>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {(['male', 'female', 'non-binary', 'prefer-not-to-say'] as Gender[]).map((g) => (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {(['male', 'female', 'prefer-not-to-say'] as Gender[]).map((g) => (
                     <Label
                       key={g}
                       htmlFor={`gender-${g}`}
@@ -151,7 +159,26 @@ export function RequesterPortal() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="tarot-card">
+            <CardHeader>
+              <CardTitle>Your Country</CardTitle>
+              <CardDescription>
+                Select your country (this will be shown to the reader as your geo-location)
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Combobox
+                options={COUNTRIES.map(c => ({ value: c, label: c }))}
+                value={country}
+                onValueChange={setCountry}
+                placeholder="Select your country..."
+                searchPlaceholder="Type to search countries..."
+                emptyText="No country found."
+              />
+            </CardContent>
+          </Card>
+
+          <Card className="tarot-card">
             <CardHeader>
               <CardTitle>Select Reading Category</CardTitle>
               <CardDescription>
@@ -169,19 +196,27 @@ export function RequesterPortal() {
               >
                 {(['relationships', 'career', 'health'] as ReadingCategory[]).map((category) => {
                   const Icon = categoryIcons[category];
+                  const gradientClass = {
+                    relationships: 'category-icon-relationships',
+                    career: 'category-icon-career',
+                    health: 'category-icon-health',
+                  }[category];
+
                   return (
                     <Label
                       key={category}
                       htmlFor={category}
-                      className={`flex flex-col items-center gap-2 p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                      className={`flex flex-col items-center gap-3 p-6 border-2 rounded-xl cursor-pointer transition-all ${
                         selectedCategory === category
-                          ? 'border-primary bg-primary/5'
-                          : 'border-border hover:border-primary/50'
+                          ? 'border-primary bg-primary/10 shadow-lg mystical-glow'
+                          : 'border-border hover:border-primary/50 hover:shadow-md'
                       }`}
                     >
                       <RadioGroupItem value={category} id={category} className="sr-only" />
-                      <Icon className="size-8" />
-                      <span className="capitalize">{category}</span>
+                      <div className={`${gradientClass} p-3 rounded-full`}>
+                        <Icon className="size-6 text-white" />
+                      </div>
+                      <span className="capitalize font-semibold">{category}</span>
                     </Label>
                   );
                 })}
@@ -189,9 +224,9 @@ export function RequesterPortal() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="tarot-card">
             <CardHeader>
-              <p className="font-semibold">
+              <p className="text-lg font-semibold">
                 Select a suggested question or write your own
               </p>
             </CardHeader>
@@ -241,7 +276,7 @@ export function RequesterPortal() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="tarot-card">
             <CardHeader>
               <CardTitle>Additional Information (Optional)</CardTitle>
               <CardDescription>
@@ -271,7 +306,8 @@ export function RequesterPortal() {
             </CardContent>
           </Card>
 
-          <Button type="submit" size="lg" className="w-full">
+          <Button type="submit" size="lg" className="w-full text-lg py-6 bg-gradient-to-r from-purple-600 to-purple-900 hover:from-purple-700 hover:to-purple-950 shadow-lg hover:shadow-xl transition-all">
+            <Sparkles className="size-5 mr-2" />
             Submit Reading Request
           </Button>
         </form>

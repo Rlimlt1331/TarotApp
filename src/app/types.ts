@@ -2,7 +2,7 @@ export type ReadingCategory = 'relationships' | 'career' | 'health';
 
 export type ReadingStatus = 'pending' | 'processing' | 'completed';
 
-export type Gender = 'male' | 'female' | 'non-binary' | 'prefer-not-to-say';
+export type Gender = 'male' | 'female' | 'prefer-not-to-say';
 
 export interface User {
   id: string;
