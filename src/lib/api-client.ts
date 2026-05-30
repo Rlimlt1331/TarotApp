@@ -45,13 +45,21 @@ class ApiClient {
     }
 
     const response = await fetch(url, options);
+    const contentType = response.headers.get('content-type') || '';
+    const responseText = await response.text();
+    const data = contentType.includes('application/json') && responseText
+      ? JSON.parse(responseText)
+      : null;
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'API request failed');
+      throw new Error(data?.error || responseText || 'API request failed');
     }
 
-    return response.json();
+    if (!data) {
+      throw new Error(`API returned a non-JSON response from ${url}`);
+    }
+
+    return data;
   }
 
   // Auth endpoints

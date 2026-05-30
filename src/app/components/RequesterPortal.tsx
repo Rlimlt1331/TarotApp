@@ -9,6 +9,8 @@ import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Badge } from './ui/badge';
 import { Combobox } from './ui/combobox';
 import { useTarot } from '../context/TarotContext';
+import { useAuth } from '../context/AuthContext';
+import { API_URL } from '../config/api';
 import { HOROSCOPES, COUNTRIES, SUGGESTED_QUESTIONS } from '../data/mockData';
 import { ReadingCategory, Gender } from '../types';
 import { Sparkles, Heart, Briefcase, Activity } from 'lucide-react';
@@ -16,6 +18,7 @@ import { toast } from 'sonner';
 
 export function RequesterPortal() {
   const { currentUser, addRequest } = useTarot();
+  const { user, token } = useAuth();
   const [selectedCategory, setSelectedCategory] = useState<ReadingCategory>('relationships');
   const [customQuestion, setCustomQuestion] = useState('');
   const [selectedQuestion, setSelectedQuestion] = useState('');
@@ -24,6 +27,7 @@ export function RequesterPortal() {
   const [gender, setGender] = useState<Gender | ''>(currentUser?.gender || '');
   const [country, setCountry] = useState(currentUser?.country || '');
   const [occupation, setOccupation] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   const categoryIcons = {
     relationships: Heart,
@@ -34,8 +38,13 @@ export function RequesterPortal() {
   const filteredQuestions = SUGGESTED_QUESTIONS.filter(q => q.category === selectedCategory);
   const isFreeReading = (currentUser?.readingsCount ?? 0) === 0;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!user || !token) {
+      toast.error('Please log in before submitting a reading request');
+      return;
+    }
 
     if (!currentUser) {
       toast.error('Please complete your profile first');
@@ -63,26 +72,60 @@ export function RequesterPortal() {
       return;
     }
 
-    addRequest({
-      userId: currentUser.id,
-      userName: currentUser.name,
-      category: selectedCategory,
-      question,
-      userInfo: {
-        horoscope: horoscope,
-        country: country,
-        gender: gender as Gender,
-        occupation: occupation || undefined,
-        additionalNotes: additionalNotes || undefined,
-      },
-      isFreeReading,
-    });
+    setSubmitting(true);
 
-    toast.success(isFreeReading ? 'Your free reading request has been submitted!' : 'Reading request submitted!');
-    setCustomQuestion('');
-    setSelectedQuestion('');
-    setAdditionalNotes('');
-    setOccupation('');
+    try {
+      const cards = [
+        { name: selectedCategory, position: 'Category', meaning: question },
+        { name: horoscope, position: 'Horoscope' },
+        { name: country, position: 'Country' },
+        { name: gender, position: 'Gender' },
+        ...(occupation ? [{ name: occupation, position: 'Occupation' }] : []),
+        ...(additionalNotes ? [{ name: additionalNotes, position: 'Additional Notes' }] : []),
+      ];
+
+      const response = await fetch(`${API_URL}/readings`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          title: question,
+          cards,
+        }),
+      });
+
+      if (!response.ok) {
+        const message = await response.text();
+        throw new Error(message || 'Failed to submit reading request');
+      }
+
+      addRequest({
+        userId: currentUser.id,
+        userName: user.name || currentUser.name,
+        category: selectedCategory,
+        question,
+        userInfo: {
+          horoscope: horoscope,
+          country: country,
+          gender: gender as Gender,
+          occupation: occupation || undefined,
+          additionalNotes: additionalNotes || undefined,
+        },
+        isFreeReading,
+      });
+
+      toast.success(isFreeReading ? 'Your free reading request has been submitted!' : 'Reading request submitted!');
+      setCustomQuestion('');
+      setSelectedQuestion('');
+      setAdditionalNotes('');
+      setOccupation('');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to submit reading request');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -306,9 +349,9 @@ export function RequesterPortal() {
             </CardContent>
           </Card>
 
-          <Button type="submit" size="lg" className="w-full text-lg py-6 bg-gradient-to-r from-purple-600 to-purple-900 hover:from-purple-700 hover:to-purple-950 shadow-lg hover:shadow-xl transition-all">
+          <Button type="submit" size="lg" disabled={submitting} className="w-full text-lg py-6 bg-gradient-to-r from-purple-600 to-purple-900 hover:from-purple-700 hover:to-purple-950 shadow-lg hover:shadow-xl transition-all">
             <Sparkles className="size-5 mr-2" />
-            Submit Reading Request
+            {submitting ? 'Submitting...' : 'Submit Reading Request'}
           </Button>
         </form>
       </div>

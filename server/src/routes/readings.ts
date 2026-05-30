@@ -83,6 +83,60 @@ router.get('/', verifyToken, async (req: AuthRequest, res: Response) => {
   }
 });
 
+// Get all submissions (admin only)
+router.get('/admin/submissions', verifyAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const readings = await prisma.reading.findMany({
+      include: {
+        cards: true,
+        user: {
+          select: { id: true, email: true, name: true },
+        },
+        feedbacks: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.json(readings);
+  } catch (error: any) {
+    console.error('Get submissions error:', error);
+    res.status(500).json({ error: 'Failed to fetch submissions' });
+  }
+});
+
+// Update a submitted reading after admin processing
+router.put('/admin/submissions/:id', verifyAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { interpretation, title } = req.body;
+
+    const reading = await prisma.reading.findUnique({
+      where: { id: parseInt(id) },
+    });
+
+    if (!reading) {
+      return res.status(404).json({ error: 'Reading not found' });
+    }
+
+    const updatedReading = await prisma.reading.update({
+      where: { id: parseInt(id) },
+      data: { interpretation, title },
+      include: {
+        cards: true,
+        user: {
+          select: { id: true, email: true, name: true },
+        },
+        feedbacks: true,
+      },
+    });
+
+    res.json(updatedReading);
+  } catch (error: any) {
+    console.error('Update admin submission error:', error);
+    res.status(500).json({ error: 'Failed to update submission' });
+  }
+});
+
 // Get single reading
 router.get('/:id', verifyToken, async (req: AuthRequest, res: Response) => {
   try {
@@ -255,27 +309,6 @@ router.delete('/:id/feedback', verifyToken, async (req: AuthRequest, res: Respon
   } catch (error: any) {
     console.error('Delete feedback error:', error);
     res.status(500).json({ error: 'Failed to delete feedback' });
-  }
-});
-
-// Get all submissions (admin only)
-router.get('/admin/submissions', verifyAdmin, async (req: AuthRequest, res: Response) => {
-  try {
-    const readings = await prisma.reading.findMany({
-      include: {
-        cards: true,
-        user: {
-          select: { id: true, email: true, name: true },
-        },
-        feedbacks: true,
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    res.json(readings);
-  } catch (error: any) {
-    console.error('Get submissions error:', error);
-    res.status(500).json({ error: 'Failed to fetch submissions' });
   }
 });
 

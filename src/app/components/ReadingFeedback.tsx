@@ -4,6 +4,7 @@ import { Textarea } from './ui/textarea';
 import { Star } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
+import { API_URL } from '../config/api';
 
 interface Feedback {
   id: number;
@@ -35,7 +36,7 @@ export const ReadingFeedback: React.FC<ReadingFeedbackProps> = ({ readingId }) =
   const fetchFeedback = async () => {
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/readings/${readingId}/feedback`,
+        `${API_URL}/readings/${readingId}/feedback`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -65,7 +66,7 @@ export const ReadingFeedback: React.FC<ReadingFeedbackProps> = ({ readingId }) =
     setLoading(true);
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/readings/${readingId}/feedback`,
+        `${API_URL}/readings/${readingId}/feedback`,
         {
           method: 'POST',
           headers: {
@@ -96,7 +97,7 @@ export const ReadingFeedback: React.FC<ReadingFeedbackProps> = ({ readingId }) =
     setLoading(true);
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/readings/${readingId}/feedback`,
+        `${API_URL}/readings/${readingId}/feedback`,
         {
           method: 'DELETE',
           headers: { Authorization: `Bearer ${token}` },

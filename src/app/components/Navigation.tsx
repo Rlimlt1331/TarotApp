@@ -17,17 +17,19 @@ import {
 
 export function Navigation({ onEditProfile }: { onEditProfile: () => void }) {
   const location = useLocation();
-  const { currentUser, isReader, setIsReader, requests } = useTarot();
+  const { requests } = useTarot();
   const { user, logout, isAdmin } = useAuth();
   const [authModalOpen, setAuthModalOpen] = useState(false);
 
   const pendingCount = requests.filter(r => r.status === 'pending').length;
 
-  const navItems = [
-    { path: '/request', label: 'Request Reading', icon: Sparkles },
-    ...(user ? [{ path: '/my-readings', label: 'My Readings', icon: BookOpen }] : []),
-    ...(isAdmin ? [{ path: '/reader', label: 'Reader Portal', icon: Eye, badge: pendingCount }] : []),
-  ];
+  const navItems = isAdmin
+    ? [{ path: '/reader', label: 'Reader Portal', icon: Eye, badge: pendingCount }]
+    : [
+        { path: '/request', label: 'Request Reading', icon: Sparkles },
+        ...(user ? [{ path: '/my-readings', label: 'My Readings', icon: BookOpen }] : []),
+      ];
+  const homePath = isAdmin ? '/reader' : '/request';
 
   return (
     <>
@@ -35,7 +37,7 @@ export function Navigation({ onEditProfile }: { onEditProfile: () => void }) {
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-6">
-              <Link to="/" className="flex items-center gap-2 group">
+              <Link to={homePath} className="flex items-center gap-2 group">
                 <Sparkles className="size-6 text-primary sparkle" />
                 <span className="text-xl font-bold bg-gradient-to-r from-purple-600 to-purple-900 bg-clip-text text-transparent">
                   Mystic Tarot Portal
