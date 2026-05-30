@@ -12,12 +12,14 @@ dotenv.config();
 
 const app: Express = express();
 const port = process.env.PORT || 3000;
-const allowedOrigins = (
-  process.env.FRONTEND_URLS ||
-  process.env.FRONTEND_URL ||
-  'http://localhost:5173'
-)
-  .split(',')
+const allowedOrigins = [
+  'http://localhost:5173',
+  'https://tarot-app-five-tawny.vercel.app',
+  process.env.FRONTEND_URL,
+  process.env.FRONTEND_URLS,
+]
+  .filter(Boolean)
+  .flatMap((origin) => origin!.split(','))
   .map((origin) => origin.trim().replace(/\/$/, ''))
   .filter(Boolean);
 
