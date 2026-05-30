@@ -3,14 +3,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { useTarot } from '../context/TarotContext';
+import { useAuth } from '../context/AuthContext';
 import { ReadingRequest } from '../types';
 import { Calendar, User, MapPin, Star, Sparkles } from 'lucide-react';
 import { format } from 'date-fns';
 import { PerformReading } from './PerformReading';
+import { AdminDashboard } from './AdminDashboard';
 
 export function ReaderPortal() {
   const { requests } = useTarot();
+  const { isAdmin } = useAuth();
   const [selectedRequest, setSelectedRequest] = useState<ReadingRequest | null>(null);
+
+  // If user is admin, show the admin dashboard
+  if (isAdmin) {
+    return <AdminDashboard />;
+  }
 
   const pendingRequests = requests.filter(r => r.status === 'pending');
   const processingRequests = requests.filter(r => r.status === 'processing');

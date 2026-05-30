@@ -32,7 +32,7 @@ router.post('/signup', async (req: AuthRequest, res: Response) => {
         password: hashedPassword,
         name: name || email.split('@')[0],
       },
-      select: { id: true, email: true, name: true },
+      select: { id: true, email: true, name: true, role: true },
     });
 
     const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, {
@@ -78,6 +78,7 @@ router.post('/login', async (req: AuthRequest, res: Response) => {
         id: user.id,
         email: user.email,
         name: user.name,
+        role: user.role,
       },
       token,
       message: 'Login successful',
@@ -99,7 +100,7 @@ router.get('/verify', async (req: AuthRequest, res: Response) => {
     const decoded: any = jwt.verify(token, JWT_SECRET);
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
-      select: { id: true, email: true, name: true },
+      select: { id: true, email: true, name: true, role: true },
     });
 
     res.json({ user, valid: true });

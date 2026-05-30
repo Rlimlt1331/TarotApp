@@ -1,12 +1,15 @@
 import { Router, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../index.js';
+import { generateReading } from '../services/geminiService.js';
+import { verifyAdmin } from '../middleware/verifyAdmin.js';
 
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'your_secret_key';
 
 interface AuthRequest extends Request {
   userId?: number;
+  userRole?: string;
 }
 
 // Middleware to verify JWT
@@ -25,15 +28,18 @@ const verifyToken = (req: AuthRequest, res: Response, next: Function) => {
   }
 };
 
-// Create a new reading
+// Create a new reading with Gemini-generated interpretation
 router.post('/', verifyToken, async (req: AuthRequest, res: Response) => {
   try {
-    const { cards, interpretation, title } = req.body;
+    const { cards, title } = req.body;
     const userId = req.userId;
 
     if (!cards || !Array.isArray(cards)) {
       return res.status(400).json({ error: 'Cards array is required' });
     }
+
+    // Generate interpretation using Gemini
+    const interpretation = await generateReading(cards, title);
 
     const reading = await prisma.reading.create({
       data: {
@@ -66,7 +72,7 @@ router.get('/', verifyToken, async (req: AuthRequest, res: Response) => {
     const userId = req.userId;
     const readings = await prisma.reading.findMany({
       where: { userId: userId! },
-      include: { cards: true },
+      include: { cards: true, feedbacks: true },
       orderBy: { createdAt: 'desc' },
     });
 
@@ -85,7 +91,7 @@ router.get('/:id', verifyToken, async (req: AuthRequest, res: Response) => {
 
     const reading = await prisma.reading.findUnique({
       where: { id: parseInt(id) },
-      include: { cards: true },
+      include: { cards: true, feedbacks: true },
     });
 
     if (!reading) {
@@ -122,7 +128,7 @@ router.put('/:id', verifyToken, async (req: AuthRequest, res: Response) => {
     const updatedReading = await prisma.reading.update({
       where: { id: parseInt(id) },
       data: { title, interpretation },
-      include: { cards: true },
+      include: { cards: true, feedbacks: true },
     });
 
     res.json(updatedReading);
@@ -153,6 +159,123 @@ router.delete('/:id', verifyToken, async (req: AuthRequest, res: Response) => {
   } catch (error: any) {
     console.error('Delete reading error:', error);
     res.status(500).json({ error: 'Failed to delete reading' });
+  }
+});
+
+// Create or update feedback for a reading
+router.post('/:id/feedback', verifyToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { rating, comment } = req.body;
+    const userId = req.userId;
+
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({ error: 'Rating must be between 1 and 5' });
+    }
+
+    const reading = await prisma.reading.findUnique({ where: { id: parseInt(id) } });
+    if (!reading) {
+      return res.status(404).json({ error: 'Reading not found' });
+    }
+
+    const feedback = await prisma.feedback.upsert({
+      where: {
+        readingId_userId: {
+          readingId: parseInt(id),
+          userId: userId!,
+        },
+      },
+      update: { rating, comment },
+      create: {
+        readingId: parseInt(id),
+        userId: userId!,
+        rating,
+        comment,
+      },
+    });
+
+    res.json(feedback);
+  } catch (error: any) {
+    console.error('Feedback error:', error);
+    res.status(500).json({ error: 'Failed to save feedback' });
+  }
+});
+
+// Get feedback for a reading
+router.get('/:id/feedback', verifyToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const userId = req.userId;
+
+    const feedback = await prisma.feedback.findUnique({
+      where: {
+        readingId_userId: {
+          readingId: parseInt(id),
+          userId: userId!,
+        },
+      },
+    });
+
+    res.json(feedback || null);
+  } catch (error: any) {
+    console.error('Get feedback error:', error);
+    res.status(500).json({ error: 'Failed to fetch feedback' });
+  }
+});
+
+// Delete feedback
+router.delete('/:id/feedback', verifyToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const userId = req.userId;
+
+    const feedback = await prisma.feedback.findUnique({
+      where: {
+        readingId_userId: {
+          readingId: parseInt(id),
+          userId: userId!,
+        },
+      },
+    });
+
+    if (!feedback) {
+      return res.status(404).json({ error: 'Feedback not found' });
+    }
+
+    await prisma.feedback.delete({
+      where: {
+        readingId_userId: {
+          readingId: parseInt(id),
+          userId: userId!,
+        },
+      },
+    });
+
+    res.json({ message: 'Feedback deleted successfully' });
+  } catch (error: any) {
+    console.error('Delete feedback error:', error);
+    res.status(500).json({ error: 'Failed to delete feedback' });
+  }
+});
+
+// Get all submissions (admin only)
+router.get('/admin/submissions', verifyAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const readings = await prisma.reading.findMany({
+      include: {
+        cards: true,
+        user: {
+          select: { id: true, email: true, name: true },
+        },
+        feedbacks: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.json(readings);
+  } catch (error: any) {
+    console.error('Get submissions error:', error);
+    res.status(500).json({ error: 'Failed to fetch submissions' });
   }
 });
 
