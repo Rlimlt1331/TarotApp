@@ -21,6 +21,21 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+async function parseApiResponse(response: Response) {
+  const contentType = response.headers.get('content-type') || '';
+  const responseText = await response.text();
+
+  if (contentType.includes('application/json') && responseText) {
+    return JSON.parse(responseText);
+  }
+
+  if (responseText) {
+    throw new Error(responseText);
+  }
+
+  throw new Error('API returned an empty response');
+}
+
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
@@ -43,7 +58,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       });
 
       if (response.ok) {
-        const data = await response.json();
+        const data = await parseApiResponse(response);
         setUser(data.user);
         setToken(tok);
       } else {
@@ -67,11 +82,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       });
 
       if (!response.ok) {
-        const error = await response.json();
+        const error = await parseApiResponse(response);
         throw new Error(error.error || 'Login failed');
       }
 
-      const data = await response.json();
+      const data = await parseApiResponse(response);
       setUser(data.user);
       setToken(data.token);
       localStorage.setItem('tarot_token', data.token);
@@ -90,11 +105,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       });
 
       if (!response.ok) {
-        const error = await response.json();
+        const error = await parseApiResponse(response);
         throw new Error(error.error || 'Signup failed');
       }
 
-      const data = await response.json();
+      const data = await parseApiResponse(response);
       setUser(data.user);
       setToken(data.token);
       localStorage.setItem('tarot_token', data.token);
