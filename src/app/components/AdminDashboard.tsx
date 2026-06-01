@@ -82,6 +82,27 @@ export const AdminDashboard: React.FC = () => {
 
   const getStatus = (readingId: number): QueueStatus => statuses[readingId] || 'pending';
 
+  const fetchSubmissions = async () => {
+    if (!token) return;
+
+    try {
+      const response = await fetch(`${API_URL}/readings/admin/submissions`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch submissions');
+      }
+
+      const data = await response.json();
+      setReadings(data);
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to load submissions');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const queueCounts = useMemo(() => {
     return readings.reduce(
       (counts, reading) => {
