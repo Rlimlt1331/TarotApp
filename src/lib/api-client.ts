@@ -1,7 +1,7 @@
 // API Client for Tarot Reading Portal
 // Handles all communication with the backend API
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://p01--agent1--md2yqj5z5vzt.code.run/api';
+import { API_URL } from '../app/config/api';
 
 class ApiClient {
   private token: string | null = null;
