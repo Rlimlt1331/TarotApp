@@ -80,6 +80,8 @@ export const AdminDashboard: React.FC = () => {
     localStorage.setItem('tarot_admin_statuses', JSON.stringify(statuses));
   }, [statuses]);
 
+  const getStatus = (readingId: number): QueueStatus => statuses[readingId] || 'pending';
+
   const queueCounts = useMemo(() => {
     return readings.reduce(
       (counts, reading) => {
@@ -89,29 +91,6 @@ export const AdminDashboard: React.FC = () => {
       { pending: 0, processing: 0, completed: 0 } as Record<QueueStatus, number>
     );
   }, [readings, statuses]);
-
-  const fetchSubmissions = async () => {
-    if (!token) return;
-
-    try {
-      const response = await fetch(`${API_URL}/readings/admin/submissions`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch submissions');
-      }
-
-      const data = await response.json();
-      setReadings(data);
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to load submissions');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const getStatus = (readingId: number): QueueStatus => statuses[readingId] || 'pending';
 
   const selectReading = (reading: Reading) => {
     setSelectedReading(reading);
