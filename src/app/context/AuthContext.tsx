@@ -81,17 +81,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         body: JSON.stringify({ email, password }),
       });
 
+      const data = await parseApiResponse(response);
+
       if (!response.ok) {
-        try {
-          const error = await parseApiResponse(response);
-          throw new Error(error.error || `Login failed (${response.status})`);
-        } catch (parseError: any) {
-          console.error('Login response error:', response.status, await response.text());
-          throw new Error(parseError.message || `Login failed (${response.status})`);
-        }
+        throw new Error(data.error || `Login failed (${response.status})`);
       }
 
-      const data = await parseApiResponse(response);
       setUser(data.user);
       setToken(data.token);
       localStorage.setItem('tarot_token', data.token);
@@ -112,17 +107,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         body: JSON.stringify({ email, password, name }),
       });
 
+      const data = await parseApiResponse(response);
+
       if (!response.ok) {
-        try {
-          const error = await parseApiResponse(response);
-          throw new Error(error.error || `Signup failed (${response.status})`);
-        } catch (parseError: any) {
-          console.error('Signup response error:', response.status, await response.text());
-          throw new Error(parseError.message || `Signup failed (${response.status})`);
-        }
+        throw new Error(data.error || `Signup failed (${response.status})`);
       }
 
-      const data = await parseApiResponse(response);
       setUser(data.user);
       setToken(data.token);
       localStorage.setItem('tarot_token', data.token);
