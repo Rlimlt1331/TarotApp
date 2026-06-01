@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
@@ -20,7 +20,7 @@ import { toast } from 'sonner';
 export function RequesterPortal({ onShowAuthModal }: { onShowAuthModal: () => void }) {
   const { currentUser, addRequest } = useTarot();
   const { user, token } = useAuth();
-  const { setPendingSubmission, clearPendingSubmission } = usePendingSubmission();
+  const { pendingSubmission, setPendingSubmission, clearPendingSubmission } = usePendingSubmission();
   const [selectedCategory, setSelectedCategory] = useState<ReadingCategory>('relationships');
   const [customQuestion, setCustomQuestion] = useState('');
   const [selectedQuestion, setSelectedQuestion] = useState('');
@@ -30,6 +30,21 @@ export function RequesterPortal({ onShowAuthModal }: { onShowAuthModal: () => vo
   const [country, setCountry] = useState(currentUser?.country || '');
   const [occupation, setOccupation] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (user && token && pendingSubmission) {
+      const data = (pendingSubmission as any).readingData;
+      setSelectedCategory(data.category);
+      setCustomQuestion(data.question || '');
+      setHoroscope(data.horoscope);
+      setGender(data.gender);
+      setCountry(data.country);
+      setOccupation(data.occupation || '');
+      setAdditionalNotes(data.additionalNotes || '');
+      toast.success('Your form data has been restored!');
+      clearPendingSubmission();
+    }
+  }, [user, token, pendingSubmission, clearPendingSubmission]);
 
   const categoryIcons = {
     relationships: Heart,
