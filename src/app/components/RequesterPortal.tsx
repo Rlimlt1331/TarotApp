@@ -10,15 +10,17 @@ import { Badge } from './ui/badge';
 import { Combobox } from './ui/combobox';
 import { useTarot } from '../context/TarotContext';
 import { useAuth } from '../context/AuthContext';
+import { usePendingSubmission } from '../context/PendingSubmissionContext';
 import { API_URL } from '../config/api';
 import { HOROSCOPES, COUNTRIES, SUGGESTED_QUESTIONS } from '../data/mockData';
 import { ReadingCategory, Gender } from '../types';
 import { Sparkles, Heart, Briefcase, Activity } from 'lucide-react';
 import { toast } from 'sonner';
 
-export function RequesterPortal() {
+export function RequesterPortal({ onShowAuthModal }: { onShowAuthModal: () => void }) {
   const { currentUser, addRequest } = useTarot();
   const { user, token } = useAuth();
+  const { setPendingSubmission, clearPendingSubmission } = usePendingSubmission();
   const [selectedCategory, setSelectedCategory] = useState<ReadingCategory>('relationships');
   const [customQuestion, setCustomQuestion] = useState('');
   const [selectedQuestion, setSelectedQuestion] = useState('');
@@ -41,16 +43,6 @@ export function RequesterPortal() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!user || !token) {
-      toast.error('Please log in before submitting a reading request');
-      return;
-    }
-
-    if (!currentUser) {
-      toast.error('Please complete your profile first');
-      return;
-    }
-
     const question = selectedQuestion || customQuestion;
     if (!question) {
       toast.error('Please select or enter a question');
@@ -69,6 +61,29 @@ export function RequesterPortal() {
 
     if (!country) {
       toast.error('Please select your country');
+      return;
+    }
+
+    if (!user || !token) {
+      setPendingSubmission({
+        readingData: {
+          category: selectedCategory,
+          question,
+          horoscope,
+          gender: gender as Gender,
+          country,
+          occupation,
+          additionalNotes,
+        },
+        timestamp: Date.now(),
+      } as any);
+      toast.error('Please log in to submit a reading request');
+      onShowAuthModal();
+      return;
+    }
+
+    if (!currentUser) {
+      toast.error('Please complete your profile first');
       return;
     }
 
@@ -113,10 +128,11 @@ export function RequesterPortal() {
           occupation: occupation || undefined,
           additionalNotes: additionalNotes || undefined,
         },
-        isFreeReading,
+        isFreeReading: (currentUser?.readingsCount ?? 0) === 0,
       });
 
-      toast.success(isFreeReading ? 'Your free reading request has been submitted!' : 'Reading request submitted!');
+      clearPendingSubmission();
+      toast.success((currentUser?.readingsCount ?? 0) === 0 ? 'Your free reading request has been submitted!' : 'Reading request submitted!');
       setCustomQuestion('');
       setSelectedQuestion('');
       setAdditionalNotes('');

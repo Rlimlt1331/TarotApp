@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { useAuth } from '../context/AuthContext';
+import { usePendingSubmission } from '../context/PendingSubmissionContext';
 import { toast } from 'sonner';
 
 interface AuthModalProps {
@@ -17,6 +18,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ open, onOpenChange }) => {
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const { login, signup } = useAuth();
+  const { pendingSubmission } = usePendingSubmission();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,12 +28,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({ open, onOpenChange }) => {
       if (mode === 'login') {
         await login(email, password);
         toast.success('Logged in successfully!');
-        onOpenChange(false);
       } else {
         await signup(email, password, name);
         toast.success('Account created successfully!');
-        onOpenChange(false);
       }
+
+      if (pendingSubmission) {
+        toast.success('Your reading request is ready to be submitted!');
+      }
+
+      onOpenChange(false);
       setEmail('');
       setPassword('');
       setName('');
