@@ -6,6 +6,7 @@ import { Input } from './ui/input';
 import { Progress } from './ui/progress';
 import { useAuth } from '../context/AuthContext';
 import { API_URL } from '../config/api';
+import { TAROT_CARDS } from '../data/mockData';
 import { ArrowLeft, Brain, Calendar, CheckCircle2, ImageUp, MapPin, Sparkles, Star, User } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -66,6 +67,7 @@ export const AdminDashboard: React.FC = () => {
     return stored ? JSON.parse(stored) : {};
   });
   const [spreadImage, setSpreadImage] = useState('');
+  const [selectedCards, setSelectedCards] = useState<string[]>([]);
   const [agentResults, setAgentResults] = useState<AgentResult[]>([]);
   const [pipelineRunning, setPipelineRunning] = useState(false);
   const [pipelineProgress, setPipelineProgress] = useState(0);
@@ -116,6 +118,7 @@ export const AdminDashboard: React.FC = () => {
   const selectReading = (reading: Reading) => {
     setSelectedReading(reading);
     setSpreadImage('');
+    setSelectedCards([]);
     setAgentResults([]);
     setPipelineProgress(0);
     setHarmonisedReading(getStatus(reading.id) === 'completed' ? reading.interpretation : '');
@@ -142,6 +145,21 @@ export const AdminDashboard: React.FC = () => {
     reader.readAsDataURL(file);
   };
 
+  const handleCardToggle = (card: string) => {
+    setSelectedCards((current) => {
+      if (current.includes(card)) {
+        return current.filter((selectedCard) => selectedCard !== card);
+      }
+
+      if (current.length >= 5) {
+        toast.error('Choose up to 5 cards');
+        return current;
+      }
+
+      return [...current, card];
+    });
+  };
+
   const buildAgentResult = async (agentName: string, reading: Reading): Promise<AgentResult> => {
     await new Promise((resolve) => setTimeout(resolve, 900 + Math.random() * 700));
 
@@ -166,8 +184,18 @@ export const AdminDashboard: React.FC = () => {
     };
   };
 
-  const runPipeline = async (_image: string) => {
+  const runPipeline = async (image?: string) => {
     if (!selectedReading) return;
+
+    const cardsForReading = selectedCards.map((card, index) => ({
+      name: card,
+      position: `Selected Card ${index + 1}`,
+    }));
+
+    if (!image && cardsForReading.length === 0) {
+      toast.error('Upload a spread photo or select at least one card');
+      return;
+    }
 
     setPipelineRunning(true);
     setPipelineProgress(15);
@@ -186,8 +214,6 @@ export const AdminDashboard: React.FC = () => {
       );
 
       setPipelineProgress(92);
-      const finalReading = createHarmonisedReading(selectedReading, results);
-      setHarmonisedReading(finalReading);
 
       const response = await fetch(`${API_URL}/readings/admin/submissions/${selectedReading.id}`, {
         method: 'PUT',
@@ -195,14 +221,20 @@ export const AdminDashboard: React.FC = () => {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ interpretation: finalReading }),
+        body: JSON.stringify({
+          spreadImage: image,
+          cards: cardsForReading,
+        }),
       });
 
       if (!response.ok) {
-        throw new Error('Pipeline completed, but saving the reading failed');
+        const message = await response.text();
+        throw new Error(message || 'Pipeline completed, but saving the reading failed');
       }
 
       const updatedReading = await response.json();
+      const finalReading = updatedReading.interpretation;
+      setHarmonisedReading(finalReading);
       setSelectedReading(updatedReading);
       setReadings((current) => current.map((reading) => (
         reading.id === updatedReading.id ? updatedReading : reading
@@ -216,28 +248,6 @@ export const AdminDashboard: React.FC = () => {
     } finally {
       setPipelineRunning(false);
     }
-  };
-
-  const createHarmonisedReading = (reading: Reading, results: AgentResult[]) => {
-    const category = reading.cards.find((card) => card.position === 'Category')?.name || 'general';
-    const horoscope = reading.cards.find((card) => card.position === 'Horoscope')?.name || 'the requester';
-    const country = reading.cards.find((card) => card.position === 'Country')?.name || 'their location';
-    const notes = reading.cards.find((card) => card.position === 'Additional Notes')?.name;
-    const vision = results.find((result) => result.name === 'Vision Agent')?.summary;
-    const astrology = results.find((result) => result.name === 'Astrology Agent')?.summary;
-    const tarot = results.find((result) => result.name === 'Tarot Interpretation Agent')?.summary;
-
-    return `Harmonised reading for: ${reading.title}
-
-The spread points to a ${category} question that should be answered with both emotional precision and practical next steps. ${vision}
-
-Astrological context: ${astrology}
-
-Tarot interpretation: ${tarot}
-
-Because the requester identifies with ${horoscope} energy and is based in ${country}, the guidance should be grounded in present circumstances rather than abstract possibility.${notes ? ` Their added context was: ${notes}` : ''}
-
-Final guidance: move slowly enough to notice the pattern, but decisively enough to change it. The reading suggests the requester is not being asked to force an outcome; they are being asked to recognise what is already becoming visible, choose the action that restores agency, and let the next conversation or decision be honest rather than performative.`;
   };
 
   if (loading) {
@@ -313,6 +323,53 @@ Final guidance: move slowly enough to notice the pattern, but decisively enough 
                 {spreadImage && (
                   <img src={spreadImage} alt="Uploaded card spread" className="w-full rounded-md border object-cover" />
                 )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Sparkles className="size-5" />
+                  Selected Cards
+                </CardTitle>
+                <CardDescription>Choose up to 5 cards when no photo is available, or add them as context for the photo.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid max-h-56 grid-cols-2 gap-2 overflow-y-auto sm:grid-cols-3">
+                  {TAROT_CARDS.map((card) => (
+                    <Button
+                      key={card}
+                      type="button"
+                      variant={selectedCards.includes(card) ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => handleCardToggle(card)}
+                      disabled={!selectedCards.includes(card) && selectedCards.length >= 5}
+                      className="h-auto justify-start py-2 text-left text-xs"
+                    >
+                      {card}
+                    </Button>
+                  ))}
+                </div>
+
+                {selectedCards.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {selectedCards.map((card, index) => (
+                      <Badge key={card} variant="secondary">
+                        {index + 1}. {card}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+
+                <Button
+                  type="button"
+                  onClick={() => runPipeline(spreadImage || undefined)}
+                  disabled={pipelineRunning || (!spreadImage && selectedCards.length === 0)}
+                  className="w-full"
+                >
+                  <Sparkles className="size-4 mr-2" />
+                  Generate Gemini Reading
+                </Button>
               </CardContent>
             </Card>
           </div>

@@ -31,28 +31,36 @@ const verifyToken = (req: AuthRequest, res: Response, next: Function) => {
 // Create a new reading with Gemini-generated interpretation
 router.post('/', verifyToken, async (req: AuthRequest, res: Response) => {
   try {
-    const { cards, title } = req.body;
+    const { cards = [], title, spreadImage, image } = req.body;
     const userId = req.userId;
 
-    if (!cards || !Array.isArray(cards)) {
-      return res.status(400).json({ error: 'Cards array is required' });
+    if (!Array.isArray(cards)) {
+      return res.status(400).json({ error: 'Cards must be an array' });
+    }
+
+    if (cards.length === 0 && !spreadImage && !image) {
+      return res.status(400).json({ error: 'Provide selected cards or an uploaded spread image' });
     }
 
     // Generate interpretation using Gemini
-    const interpretation = await generateReading(cards, title);
+    const interpretation = await generateReading(cards, title, spreadImage || image);
 
     const reading = await prisma.reading.create({
       data: {
         userId: userId!,
         title: title || 'Untitled Reading',
         interpretation,
-        cards: {
-          create: cards.map((card: any) => ({
-            name: card.name,
-            position: card.position,
-            meaning: card.meaning,
-          })),
-        },
+        ...(cards.length > 0
+          ? {
+              cards: {
+                create: cards.map((card: any) => ({
+                  name: card.name,
+                  position: card.position,
+                  meaning: card.meaning,
+                })),
+              },
+            }
+          : {}),
       },
       include: {
         cards: true,
@@ -108,19 +116,33 @@ router.get('/admin/submissions', verifyAdmin, async (req: AuthRequest, res: Resp
 router.put('/admin/submissions/:id', verifyAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const { interpretation, title } = req.body;
+    const { interpretation, title, spreadImage, image, cards } = req.body;
 
     const reading = await prisma.reading.findUnique({
       where: { id: parseInt(id) },
+      include: { cards: true },
     });
 
     if (!reading) {
       return res.status(404).json({ error: 'Reading not found' });
     }
 
+    const selectedCards = Array.isArray(cards) ? cards : [];
+    const imageInput = spreadImage || image;
+    const generatedInterpretation = imageInput || selectedCards.length > 0
+      ? await generateReading(
+          selectedCards.length > 0 ? selectedCards : reading.cards,
+          title || reading.title || undefined,
+          imageInput
+        )
+      : interpretation;
+
     const updatedReading = await prisma.reading.update({
       where: { id: parseInt(id) },
-      data: { interpretation, title },
+      data: {
+        interpretation: generatedInterpretation,
+        ...(title !== undefined ? { title } : {}),
+      },
       include: {
         cards: true,
         user: {
