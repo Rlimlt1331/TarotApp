@@ -3,13 +3,11 @@ import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
-import { Label } from './ui/label';
 import { Badge } from './ui/badge';
 import { Progress } from './ui/progress';
 import { useTarot } from '../context/TarotContext';
 import { ReadingRequest, AIAgentReading } from '../types';
-import { TAROT_CARDS, AI_AGENTS } from '../data/mockData';
-import { ArrowLeft, Upload, Sparkles, Brain, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Sparkles, Brain, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiClient } from '../../lib/api-client';
 
@@ -32,14 +30,6 @@ export function PerformReading({ request, onBack }: PerformReadingProps) {
     updateRequestStatus(request.id, 'processing');
   }, []);
 
-  const handleCardToggle = (card: string) => {
-    if (selectedCards.includes(card)) {
-      setSelectedCards(selectedCards.filter(c => c !== card));
-    } else if (selectedCards.length < 5) {
-      setSelectedCards([...selectedCards, card]);
-    }
-  };
-
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -52,8 +42,8 @@ export function PerformReading({ request, onBack }: PerformReadingProps) {
   };
 
   const handleGenerateReading = async () => {
-    if (selectedCards.length === 0 && !cardSpreadImage) {
-      toast.error('Please select at least one card or upload a spread image');
+    if (!cardSpreadImage) {
+      toast.error('Please upload a spread image');
       return;
     }
 
@@ -144,32 +134,7 @@ export function PerformReading({ request, onBack }: PerformReadingProps) {
 
         <Card className="tarot-card">
           <CardHeader>
-            <CardTitle>1. Select Cards</CardTitle>
-            <CardDescription>
-              Choose up to 5 cards for this reading ({selectedCards.length}/5 selected)
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-64 overflow-y-auto">
-              {TAROT_CARDS.map((card) => (
-                <Button
-                  key={card}
-                  variant={selectedCards.includes(card) ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => handleCardToggle(card)}
-                  disabled={!selectedCards.includes(card) && selectedCards.length >= 5}
-                  className="text-xs h-auto py-2"
-                >
-                  {card}
-                </Button>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="tarot-card">
-          <CardHeader>
-            <CardTitle>2. Upload Card Spread Image (Optional)</CardTitle>
+            <CardTitle>1. Upload Card Spread Image</CardTitle>
             <CardDescription>
               Upload a photo of the physical card spread
             </CardDescription>
@@ -189,7 +154,7 @@ export function PerformReading({ request, onBack }: PerformReadingProps) {
 
         <Card className="tarot-card">
           <CardHeader>
-            <CardTitle>3. Generate AI-Assisted Reading</CardTitle>
+            <CardTitle>2. Generate AI-Assisted Reading</CardTitle>
             <CardDescription>
               Multiple AI agents will analyze the cards and provide harmonized insights
             </CardDescription>
@@ -197,7 +162,7 @@ export function PerformReading({ request, onBack }: PerformReadingProps) {
           <CardContent className="space-y-4">
             <Button
               onClick={handleGenerateReading}
-              disabled={isProcessing || (selectedCards.length === 0 && !cardSpreadImage)}
+              disabled={isProcessing || !cardSpreadImage}
               className="w-full"
             >
               <Sparkles className="size-4 mr-2" />
@@ -221,7 +186,7 @@ export function PerformReading({ request, onBack }: PerformReadingProps) {
               <div className="space-y-6 mt-6">
                 {selectedCards.length > 0 && (
                   <div className="p-4 bg-muted/50 rounded-lg border border-border">
-                    <h3 className="font-medium text-sm mb-3">Cards to be Analyzed:</h3>
+                    <h3 className="font-medium text-sm mb-3">Detected Cards:</h3>
                     <div className="flex flex-wrap gap-2">
                       {selectedCards.map((card, idx) => (
                         <Badge key={idx} variant="secondary" className="px-3 py-1">
@@ -231,6 +196,27 @@ export function PerformReading({ request, onBack }: PerformReadingProps) {
                     </div>
                   </div>
                 )}
+              </div>
+            )}
+
+            {aiReadings.length > 0 && (
+              <div className="space-y-3 mt-6">
+                <h3 className="font-medium">Multi-Agent Pipeline Insights:</h3>
+                {aiReadings.map((reading, idx) => (
+                  <Card key={idx}>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm flex items-center justify-between">
+                        <span>{reading.agentName}</span>
+                        <Badge variant="outline">
+                          {(reading.confidence * 100).toFixed(0)}% confidence
+                        </Badge>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">{reading.interpretation}</p>
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
             )}
 
@@ -253,27 +239,6 @@ export function PerformReading({ request, onBack }: PerformReadingProps) {
                   />
                 </CardContent>
               </Card>
-            )}
-
-            {aiReadings.length > 0 && (
-              <div className="space-y-3 mt-6">
-                <h3 className="font-medium">Multi-Agent Pipeline Insights:</h3>
-                {aiReadings.map((reading, idx) => (
-                  <Card key={idx}>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-sm flex items-center justify-between">
-                        <span>{reading.agentName}</span>
-                        <Badge variant="outline">
-                          {(reading.confidence * 100).toFixed(0)}% confidence
-                        </Badge>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">{reading.interpretation}</p>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
             )}
           </CardContent>
         </Card>
