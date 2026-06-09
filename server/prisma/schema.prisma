@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider      = "prisma-client-js"
   binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
@@ -11,82 +8,75 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum UserRole {
-  requester
-  admin
-}
-
 model User {
-  id        Int     @id @default(autoincrement())
-  email     String  @unique
-  password  String
-  name      String?
-  role      UserRole @default(requester)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  readings  Reading[]
+  id          Int              @id @default(autoincrement())
+  email       String           @unique
+  password    String
+  name        String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  role        UserRole         @default(requester)
+  feedbacks   Feedback[]
+  readings    Reading[]
   preferences UserPreferences?
-  feedbacks Feedback[]
 
   @@map("users")
 }
 
 model UserPreferences {
-  id        Int     @id @default(autoincrement())
-  userId    Int     @unique
-  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  theme     String  @default("light")
-  language  String  @default("en")
+  id        Int      @id @default(autoincrement())
+  userId    Int      @unique
+  theme     String   @default("light")
+  language  String   @default("en")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_preferences")
 }
 
 model Reading {
-  id        Int     @id @default(autoincrement())
-  userId    Int
-  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  cards     Card[]
-  feedbacks Feedback[]
+  id             Int        @id @default(autoincrement())
+  userId         Int
   interpretation String?
-  title     String?
-  
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  title          String?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  cards          Card[]
+  feedbacks      Feedback[]
+  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("readings")
 }
 
 model Card {
-  id        Int     @id @default(autoincrement())
+  id        Int      @id @default(autoincrement())
   readingId Int
-  reading   Reading @relation(fields: [readingId], references: [id], onDelete: Cascade)
-  
   name      String
   position  String
   meaning   String?
-  
   createdAt DateTime @default(now())
+  reading   Reading  @relation(fields: [readingId], references: [id], onDelete: Cascade)
 
   @@map("cards")
 }
 
 model Feedback {
-  id        Int     @id @default(autoincrement())
+  id        Int      @id @default(autoincrement())
   readingId Int
-  reading   Reading @relation(fields: [readingId], references: [id], onDelete: Cascade)
   userId    Int
-  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  rating    Int     // 1-5 star rating
+  rating    Int
   comment   String?
-  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  reading   Reading  @relation(fields: [readingId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([readingId, userId])
   @@map("feedbacks")
+}
+
+enum UserRole {
+  requester
+  admin
 }

@@ -164,19 +164,6 @@ export function PerformReading({ request, onBack }: PerformReadingProps) {
                 </Button>
               ))}
             </div>
-
-            {selectedCards.length > 0 && (
-              <div className="mt-4 p-3 bg-muted rounded-lg">
-                <p className="text-sm mb-2">Selected Cards:</p>
-                <div className="flex flex-wrap gap-2">
-                  {selectedCards.map((card, idx) => (
-                    <Badge key={idx} variant="secondary">
-                      {idx + 1}. {card}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            )}
           </CardContent>
         </Card>
 
@@ -230,24 +217,41 @@ export function PerformReading({ request, onBack }: PerformReadingProps) {
               </div>
             )}
 
-            {aiReadings.length > 0 && (
-              <div className="space-y-3">
-                <h3 className="font-medium">AI Agent Insights:</h3>
-                {aiReadings.map((reading, idx) => (
-                  <Card key={idx}>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-sm flex items-center justify-between">
-                        <span>{reading.agentName}</span>
-                        <Badge variant="outline">
-                          {(reading.confidence * 100).toFixed(0)}% confidence
+            {(aiReadings.length > 0 || selectedCards.length > 0) && (
+              <div className="space-y-6 mt-6">
+                {selectedCards.length > 0 && (
+                  <div className="p-4 bg-muted/50 rounded-lg border border-border">
+                    <h3 className="font-medium text-sm mb-3">Cards to be Analyzed:</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedCards.map((card, idx) => (
+                        <Badge key={idx} variant="secondary" className="px-3 py-1">
+                          {idx + 1}. {card}
                         </Badge>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-muted-foreground">{reading.interpretation}</p>
-                    </CardContent>
-                  </Card>
-                ))}
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {aiReadings.length > 0 && (
+                  <div className="space-y-3">
+                    <h3 className="font-medium">Multi-Agent Pipeline Insights:</h3>
+                    {aiReadings.map((reading, idx) => (
+                      <Card key={idx}>
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-sm flex items-center justify-between">
+                            <span>{reading.agentName}</span>
+                            <Badge variant="outline">
+                              {(reading.confidence * 100).toFixed(0)}% confidence
+                            </Badge>
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <p className="text-sm text-muted-foreground whitespace-pre-wrap">{reading.interpretation}</p>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 

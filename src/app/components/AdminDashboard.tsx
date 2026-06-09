@@ -45,6 +45,13 @@ interface AgentResult {
   confidence: number;
 }
 
+interface DetectedCard {
+  name: string;
+  position: string;
+  confidence?: string;
+  visualEvidence?: string;
+}
+
 const agentNames = [
   'Vision Agent',
   'Astrology Agent',
@@ -72,6 +79,7 @@ export const AdminDashboard: React.FC = () => {
   const [pipelineRunning, setPipelineRunning] = useState(false);
   const [pipelineProgress, setPipelineProgress] = useState(0);
   const [harmonisedReading, setHarmonisedReading] = useState('');
+  const [detectedCards, setDetectedCards] = useState<DetectedCard[]>([]);
   const { token } = useAuth();
 
   useEffect(() => {
@@ -122,6 +130,7 @@ export const AdminDashboard: React.FC = () => {
     setAgentResults([]);
     setPipelineProgress(0);
     setHarmonisedReading(getStatus(reading.id) === 'completed' ? reading.interpretation : '');
+    setDetectedCards([]);
   };
 
   const updateStatus = (readingId: number, status: QueueStatus) => {
@@ -201,6 +210,7 @@ export const AdminDashboard: React.FC = () => {
     setPipelineProgress(15);
     setAgentResults([]);
     setHarmonisedReading('');
+    setDetectedCards([]);
     updateStatus(selectedReading.id, 'processing');
 
     try {
@@ -228,12 +238,16 @@ export const AdminDashboard: React.FC = () => {
       });
 
       if (!response.ok) {
-        const message = await response.text();
+        const contentType = response.headers.get('content-type') || '';
+        const message = contentType.includes('application/json')
+          ? (await response.json()).error
+          : await response.text();
         throw new Error(message || 'Pipeline completed, but saving the reading failed');
       }
 
       const updatedReading = await response.json();
       const finalReading = updatedReading.interpretation;
+      setDetectedCards(updatedReading.detectedCards || []);
       setHarmonisedReading(finalReading);
       setSelectedReading(updatedReading);
       setReadings((current) => current.map((reading) => (
@@ -381,7 +395,7 @@ export const AdminDashboard: React.FC = () => {
                   <Brain className="size-5" />
                   Multi-Agent Pipeline
                 </CardTitle>
-                <CardDescription>Vision, astrology, tarot interpretation, and harmonisation run in parallel.</CardDescription>
+                <CardDescription>Gemini reads the photo or selected cards, then saves the final interpretation.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 {(pipelineRunning || pipelineProgress > 0) && (
@@ -417,6 +431,41 @@ export const AdminDashboard: React.FC = () => {
                 </div>
               </CardContent>
             </Card>
+
+            {(pipelineRunning || detectedCards.length > 0 || harmonisedReading) && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <ImageUp className="size-5" />
+                    Detected Cards
+                  </CardTitle>
+                  <CardDescription>Use this to verify that Gemini is reading the uploaded image.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {pipelineRunning && detectedCards.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Waiting for Gemini vision output...</p>
+                  ) : detectedCards.length > 0 ? (
+                    <div className="space-y-3">
+                      {detectedCards.map((card, index) => (
+                        <div key={`${card.position}-${card.name}-${index}`} className="rounded-md border p-3">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge variant="secondary">{index + 1}</Badge>
+                            <p className="font-medium">{card.name}</p>
+                            <Badge variant="outline">{card.position}</Badge>
+                            {card.confidence && <Badge>{card.confidence}</Badge>}
+                          </div>
+                          {card.visualEvidence && (
+                            <p className="mt-2 text-sm text-muted-foreground">{card.visualEvidence}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No cards were confidently identified from the image.</p>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
             {harmonisedReading && (
               <Card className="border-primary">
