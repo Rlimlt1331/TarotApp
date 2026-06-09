@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
+import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
 import { Badge } from './ui/badge';
 import { Progress } from './ui/progress';
@@ -10,6 +11,7 @@ import { ReadingRequest, AIAgentReading } from '../types';
 import { TAROT_CARDS, AI_AGENTS } from '../data/mockData';
 import { ArrowLeft, Upload, Sparkles, Brain, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { apiClient } from '../../lib/api-client';
 
 interface PerformReadingProps {
   request: ReadingRequest;
@@ -49,94 +51,53 @@ export function PerformReading({ request, onBack }: PerformReadingProps) {
     }
   };
 
-  const simulateAIReading = async (agentName: string, cards: string[]): Promise<AIAgentReading> => {
-    await new Promise(resolve => setTimeout(resolve, 1500));
-
-    const interpretations = {
-      relationships: [
-        `The cards reveal a transformative period in your emotional connections. ${cards[0]} suggests new beginnings, while ${cards[1]} indicates the need for balance and patience.`,
-        `Your heart's journey shows signs of growth and healing. The presence of ${cards[0]} signals opening yourself to vulnerability, leading to deeper authentic connections.`,
-        `A significant shift in relationship dynamics is approaching. ${cards[0]} combined with ${cards[1]} suggests letting go of past patterns to welcome new harmonious energy.`,
-      ],
-      career: [
-        `Professional opportunities are aligning with your true purpose. ${cards[0]} indicates it's time to trust your skills and take calculated risks in your career path.`,
-        `The cards show a period of professional transformation ahead. ${cards[0]} suggests leadership qualities emerging, while ${cards[1]} indicates the importance of strategic planning.`,
-        `Career advancement requires both courage and wisdom. ${cards[0]} shows potential for significant growth when you align your work with your authentic values.`,
-      ],
-      health: [
-        `Your wellbeing journey shows promise for positive change. ${cards[0]} suggests focusing on mind-body balance, while ${cards[1]} indicates the healing power of rest and reflection.`,
-        `The cards reveal important insights about your wellness path. ${cards[0]} encourages you to listen to your body's wisdom and prioritize self-care practices.`,
-        `A holistic approach to health is needed now. ${cards[0]} combined with ${cards[1]} suggests integrating physical activity with emotional healing for optimal wellness.`,
-      ],
-    };
-
-    const categoryInterpretations = interpretations[request.category];
-    const randomInterpretation = categoryInterpretations[Math.floor(Math.random() * categoryInterpretations.length)];
-
-    return {
-      agentName,
-      interpretation: randomInterpretation,
-      confidence: 0.75 + Math.random() * 0.2,
-    };
-  };
-
-  const harmonizeReadings = (readings: AIAgentReading[], cards: string[]): string => {
-    const categoryGuidance = {
-      relationships: 'in matters of the heart and personal connections',
-      career: 'regarding your professional journey and aspirations',
-      health: 'concerning your wellbeing and vitality',
-    };
-
-    return `Based on the cosmic wisdom of the cards you've drawn - ${cards.join(', ')} - here is your harmonized reading ${categoryGuidance[request.category]}:
-
-The collective insight from multiple mystical sources reveals a powerful message for you. This reading combines ancient tarot wisdom with modern intuitive guidance to provide you with the clearest path forward.
-
-${readings[0]?.interpretation}
-
-The secondary insights suggest that ${readings[1]?.interpretation.toLowerCase()}
-
-Furthermore, the spiritual guidance indicates that ${readings[2]?.interpretation.toLowerCase()}
-
-Remember, ${request.userInfo.horoscope} energy influences your current journey. As someone from ${request.userInfo.country}, your unique perspective and experiences shape how these energies manifest in your life.
-
-The cards encourage you to trust your intuition and take inspired action. The universe is supporting your growth and evolution during this time.`;
-  };
-
   const handleGenerateReading = async () => {
-    if (selectedCards.length === 0) {
-      toast.error('Please select at least one card');
+    if (selectedCards.length === 0 && !cardSpreadImage) {
+      toast.error('Please select at least one card or upload a spread image');
       return;
     }
 
     setIsProcessing(true);
-    setProcessingProgress(0);
+    setProcessingProgress(10);
+    setCurrentAgent('Connecting to Vision & Tarot AI...');
     setAiReadings([]);
 
     try {
-      const readings: AIAgentReading[] = [];
-
-      for (let i = 0; i < AI_AGENTS.length; i++) {
-        const agent = AI_AGENTS[i];
-        setCurrentAgent(agent);
-        setProcessingProgress((i / AI_AGENTS.length) * 100);
-
-        const reading = await simulateAIReading(agent, selectedCards);
-        readings.push(reading);
-        setAiReadings([...readings]);
-      }
-
-      setProcessingProgress(95);
+      const response = await apiClient.generateDraft(
+        cardSpreadImage || undefined,
+        selectedCards,
+        request.question,
+        request.userInfo.horoscope
+      );
+      
+      setProcessingProgress(90);
       setCurrentAgent('Harmonizing readings...');
 
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const newAiReadings: AIAgentReading[] = [
+        {
+          agentName: 'Tarot Vision AI',
+          interpretation: response.tarotReading,
+          confidence: 0.95,
+        },
+        {
+          agentName: 'Astrology AI',
+          interpretation: response.horoscopeReading,
+          confidence: 0.88,
+        }
+      ];
 
-      const harmonized = harmonizeReadings(readings, selectedCards);
-      setHarmonizedReading(harmonized);
+      setAiReadings(newAiReadings);
+      setHarmonizedReading(response.harmonizedReading);
+      
+      // Update selected cards if Vision AI detected them from image
+      if (response.detectedCards && response.detectedCards.length > 0) {
+        setSelectedCards(response.detectedCards);
+      }
+
       setProcessingProgress(100);
-
       toast.success('Reading generated successfully!');
-    } catch (error) {
-      toast.error('Failed to generate reading');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to generate reading');
     } finally {
       setIsProcessing(false);
       setCurrentAgent('');
@@ -249,7 +210,7 @@ The cards encourage you to trust your intuition and take inspired action. The un
           <CardContent className="space-y-4">
             <Button
               onClick={handleGenerateReading}
-              disabled={isProcessing || selectedCards.length === 0}
+              disabled={isProcessing || (selectedCards.length === 0 && !cardSpreadImage)}
               className="w-full"
             >
               <Sparkles className="size-4 mr-2" />
@@ -295,13 +256,18 @@ The cards encourage you to trust your intuition and take inspired action. The un
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Sparkles className="size-5" />
-                    Harmonized Reading
+                    Review Harmonized Reading
                   </CardTitle>
+                  <CardDescription>
+                    Review and edit the AI-harmonized reading before submitting it to the requester.
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <p className="whitespace-pre-wrap text-sm leading-relaxed">
-                    {harmonizedReading}
-                  </p>
+                  <Textarea
+                    value={harmonizedReading}
+                    onChange={(e) => setHarmonizedReading(e.target.value)}
+                    className="min-h-[200px] text-sm leading-relaxed"
+                  />
                 </CardContent>
               </Card>
             )}

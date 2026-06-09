@@ -76,6 +76,15 @@ class ApiClient {
   }
 
   // Readings endpoints
+  async generateDraft(image: string | undefined, cards: string[], question: string, horoscope: string) {
+    return this.request('POST', '/readings/generate-draft', {
+      image,
+      cards,
+      question,
+      horoscope,
+    });
+  }
+
   async createReading(cards: any[], interpretation?: string, title?: string) {
     return this.request('POST', '/readings', {
       cards,

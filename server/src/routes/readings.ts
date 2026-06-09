@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../index.js';
-import { generateReading } from '../services/geminiService.js';
+import { GeminiGenerationError, generateReading, generateReadingAnalysis, generateAdvancedReading } from '../services/geminiService.js';
 import { verifyAdmin } from '../middleware/verifyAdmin.js';
 
 const router = Router();
@@ -27,6 +27,33 @@ const verifyToken = (req: AuthRequest, res: Response, next: Function) => {
     res.status(401).json({ error: 'Invalid token' });
   }
 };
+
+// Generate advanced reading draft without saving
+router.post('/generate-draft', verifyToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const { image, cards = [], question, horoscope } = req.body;
+    
+    if (!question || !horoscope) {
+      return res.status(400).json({ error: 'Question and horoscope are required' });
+    }
+
+    if (!Array.isArray(cards) && !image) {
+      return res.status(400).json({ error: 'Provide selected cards or an uploaded image' });
+    }
+
+    const advancedReading = await generateAdvancedReading(image, cards, question, horoscope);
+    res.json(advancedReading);
+  } catch (error: any) {
+    console.error('Generate draft error:', error);
+    if (error instanceof GeminiGenerationError) {
+      return res.status(error.status).json({
+        error: error.message,
+        retryDelay: error.retryDelay,
+      });
+    }
+    res.status(500).json({ error: 'Failed to generate reading draft' });
+  }
+});
 
 // Create a new reading with Gemini-generated interpretation
 router.post('/', verifyToken, async (req: AuthRequest, res: Response) => {
@@ -129,18 +156,18 @@ router.put('/admin/submissions/:id', verifyAdmin, async (req: AuthRequest, res: 
 
     const selectedCards = Array.isArray(cards) ? cards : [];
     const imageInput = spreadImage || image;
-    const generatedInterpretation = imageInput || selectedCards.length > 0
-      ? await generateReading(
+    const generated = imageInput || selectedCards.length > 0
+      ? await generateReadingAnalysis(
           selectedCards.length > 0 ? selectedCards : reading.cards,
           title || reading.title || undefined,
           imageInput
         )
-      : interpretation;
+      : { interpretation, detectedCards: [] };
 
     const updatedReading = await prisma.reading.update({
       where: { id: parseInt(id) },
       data: {
-        interpretation: generatedInterpretation,
+        interpretation: generated.interpretation,
         ...(title !== undefined ? { title } : {}),
       },
       include: {
@@ -152,9 +179,16 @@ router.put('/admin/submissions/:id', verifyAdmin, async (req: AuthRequest, res: 
       },
     });
 
-    res.json(updatedReading);
+    res.json({ ...updatedReading, detectedCards: generated.detectedCards });
   } catch (error: any) {
     console.error('Update admin submission error:', error);
+    if (error instanceof GeminiGenerationError) {
+      return res.status(error.status).json({
+        error: error.message,
+        retryDelay: error.retryDelay,
+      });
+    }
+
     res.status(500).json({ error: 'Failed to update submission' });
   }
 });
