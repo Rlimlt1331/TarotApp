@@ -231,32 +231,11 @@ export function PerformReading({ request, onBack }: PerformReadingProps) {
                     </div>
                   </div>
                 )}
-                
-                {aiReadings.length > 0 && (
-                  <div className="space-y-3">
-                    <h3 className="font-medium">Multi-Agent Pipeline Insights:</h3>
-                    {aiReadings.map((reading, idx) => (
-                      <Card key={idx}>
-                        <CardHeader className="pb-3">
-                          <CardTitle className="text-sm flex items-center justify-between">
-                            <span>{reading.agentName}</span>
-                            <Badge variant="outline">
-                              {(reading.confidence * 100).toFixed(0)}% confidence
-                            </Badge>
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <p className="text-sm text-muted-foreground whitespace-pre-wrap">{reading.interpretation}</p>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                )}
               </div>
             )}
 
             {harmonizedReading && (
-              <Card className="border-primary">
+              <Card className="border-primary mt-6">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Sparkles className="size-5" />
@@ -274,6 +253,27 @@ export function PerformReading({ request, onBack }: PerformReadingProps) {
                   />
                 </CardContent>
               </Card>
+            )}
+
+            {aiReadings.length > 0 && (
+              <div className="space-y-3 mt-6">
+                <h3 className="font-medium">Multi-Agent Pipeline Insights:</h3>
+                {aiReadings.map((reading, idx) => (
+                  <Card key={idx}>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm flex items-center justify-between">
+                        <span>{reading.agentName}</span>
+                        <Badge variant="outline">
+                          {(reading.confidence * 100).toFixed(0)}% confidence
+                        </Badge>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">{reading.interpretation}</p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
             )}
           </CardContent>
         </Card>
