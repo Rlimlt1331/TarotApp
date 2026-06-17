@@ -1,10 +1,10 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-const PRIMARY_GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+const PRIMARY_GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite';
 const GEMINI_MODELS = [
   PRIMARY_GEMINI_MODEL,
-  ...(process.env.GEMINI_FALLBACK_MODELS || 'gemini-2.5-flash-lite')
+  ...(process.env.GEMINI_FALLBACK_MODELS || 'gemini-3.gemini-2.5-flash,gpt-4.0-turbo')
     .split(',')
     .map((model) => model.trim())
     .filter(Boolean),
