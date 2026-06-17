@@ -34,7 +34,7 @@ test('Tarot App Regression Test Suite', async (t) => {
     });
     
     assert.strictEqual(res.status, 201, 'Should return 201 Created');
-    const data = await res.json();
+    const data = await res.json() as any;
     assert.ok(data.token, 'Should return a JWT token');
     assert.ok(data.user, 'Should return user object');
     
@@ -53,7 +53,7 @@ test('Tarot App Regression Test Suite', async (t) => {
     });
     
     assert.strictEqual(res.status, 200, 'Should return 200 OK');
-    const data = await res.json();
+    const data = await res.json() as any;
     assert.ok(data.token, 'Should return a JWT token on login');
     token = data.token; // Refresh token
   });
@@ -75,7 +75,7 @@ test('Tarot App Regression Test Suite', async (t) => {
     });
 
     assert.strictEqual(res.status, 201, 'Should return 201 Created');
-    const data = await res.json();
+    const data = await res.json() as any;
     assert.strictEqual(data.title, 'My Regression Test Reading', 'Title should match');
     assert.ok(data.interpretation, 'Should have an interpretation generated');
     assert.strictEqual(data.cards.length, 2, 'Should save 2 cards');
@@ -97,7 +97,7 @@ test('Tarot App Regression Test Suite', async (t) => {
     });
 
     assert.strictEqual(res.status, 200, 'Should return 200 OK for draft generation');
-    const data = await res.json();
+    const data = await res.json() as any;
     
     // Check for the expected keys returned by the new feature
     assert.ok(data.detectedCards, 'Should return detectedCards');
@@ -119,7 +119,7 @@ test('Tarot App Regression Test Suite', async (t) => {
     });
     
     assert.strictEqual(res.status, 200, 'Should return 200 OK');
-    const data = await res.json();
+    const data = await res.json() as any;
     assert.ok(Array.isArray(data), 'Should return an array of readings');
     assert.ok(data.length >= 1, 'Should have at least one reading in history');
   });
@@ -135,7 +135,7 @@ test('Tarot App Regression Test Suite', async (t) => {
     });
 
     assert.ok([200, 201].includes(res.status), 'Should return success status for feedback');
-    const data = await res.json();
+    const data = await res.json() as any;
     assert.strictEqual(data.rating, 5, 'Rating should be saved correctly');
   });
 
@@ -147,14 +147,14 @@ test('Tarot App Regression Test Suite', async (t) => {
       body: JSON.stringify({ email: 'rabbit@admin.com', password: 'admin123' })
     });
     assert.strictEqual(loginRes.status, 200, 'Admin should be able to login');
-    adminToken = (await loginRes.json()).token;
+    adminToken = ((await loginRes.json()) as any).token;
 
     // 2. Fetch admin submissions
     const adminRes = await fetch(`${API_URL}/readings/admin/submissions`, {
       headers: { 'Authorization': `Bearer ${adminToken}` }
     });
     assert.strictEqual(adminRes.status, 200, 'Admin should be authorized to view submissions');
-    const adminData = await adminRes.json();
+    const adminData = await adminRes.json() as any;
     assert.ok(Array.isArray(adminData), 'Should return an array of all platform submissions');
   });
 });
