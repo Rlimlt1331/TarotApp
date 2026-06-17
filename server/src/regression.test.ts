@@ -2,10 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert';
 import { PrismaClient } from '@prisma/client';
 
-const API_URL = 'http://localhost:3001/api';
+const API_URL = 'http://localhost:3000/api';
 const prisma = new PrismaClient();
 let token = '';
 let testUserId: number;
+let testReadingId: number;
+let adminToken = '';
 
 const TEST_EMAIL = `test-${Date.now()}@example.com`;
 const TEST_PASSWORD = 'password123';
@@ -77,6 +79,7 @@ test('Tarot App Regression Test Suite', async (t) => {
     assert.strictEqual(data.title, 'My Regression Test Reading', 'Title should match');
     assert.ok(data.interpretation, 'Should have an interpretation generated');
     assert.strictEqual(data.cards.length, 2, 'Should save 2 cards');
+    testReadingId = data.id;
   });
 
   await t.test('4. New Feature: Generate Advanced Reading Draft', async () => {
@@ -110,4 +113,48 @@ test('Tarot App Regression Test Suite', async (t) => {
     assert.strictEqual(typeof data.harmonizedReading, 'string');
   });
 
+  await t.test('5. Base Feature: Retrieve My Readings', async () => {
+    const res = await fetch(`${API_URL}/readings`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    
+    assert.strictEqual(res.status, 200, 'Should return 200 OK');
+    const data = await res.json();
+    assert.ok(Array.isArray(data), 'Should return an array of readings');
+    assert.ok(data.length >= 1, 'Should have at least one reading in history');
+  });
+
+  await t.test('6. Base Feature: Submit Feedback', async () => {
+    const res = await fetch(`${API_URL}/readings/${testReadingId}/feedback`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ rating: 5, comment: 'Spot on!' })
+    });
+
+    assert.ok([200, 201].includes(res.status), 'Should return success status for feedback');
+    const data = await res.json();
+    assert.strictEqual(data.rating, 5, 'Rating should be saved correctly');
+  });
+
+  await t.test('7. Base Feature: Admin Login & Submissions', async () => {
+    // 1. Admin login
+    const loginRes = await fetch(`${API_URL}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'rabbit@admin.com', password: 'admin123' })
+    });
+    assert.strictEqual(loginRes.status, 200, 'Admin should be able to login');
+    adminToken = (await loginRes.json()).token;
+
+    // 2. Fetch admin submissions
+    const adminRes = await fetch(`${API_URL}/readings/admin/submissions`, {
+      headers: { 'Authorization': `Bearer ${adminToken}` }
+    });
+    assert.strictEqual(adminRes.status, 200, 'Admin should be authorized to view submissions');
+    const adminData = await adminRes.json();
+    assert.ok(Array.isArray(adminData), 'Should return an array of all platform submissions');
+  });
 });
