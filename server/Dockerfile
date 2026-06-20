@@ -3,6 +3,9 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# OpenSSL is required so Prisma can detect the correct binary target during generation
+RUN apk add --no-cache openssl
+
 # Copy package files
 COPY package*.json ./
 
