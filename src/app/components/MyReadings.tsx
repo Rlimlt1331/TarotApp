@@ -13,7 +13,7 @@ import { toast } from 'sonner';
 interface BackendReading {
   id: number;
   title: string;
-  interpretation: string;
+  interpretation: string | null;
   createdAt: string;
   cards: Array<{
     id: number;
@@ -51,6 +51,9 @@ export function MyReadings() {
     general: 'bg-purple-500/10 text-purple-700 border-purple-200',
   };
 
+  const completedCount = readings.filter(r => r.interpretation && r.interpretation.trim() !== '').length;
+  const pendingCount = readings.filter(r => !r.interpretation || r.interpretation.trim() === '').length;
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -86,7 +89,7 @@ export function MyReadings() {
               <CardTitle className="text-sm text-green-900 dark:text-green-100">Completed</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-4xl font-bold text-green-600">{readings.length}</div>
+              <div className="text-4xl font-bold text-green-600">{completedCount}</div>
             </CardContent>
           </Card>
           <Card className="tarot-card bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-950 dark:to-amber-900 border-amber-200">
@@ -94,17 +97,17 @@ export function MyReadings() {
               <CardTitle className="text-sm text-amber-900 dark:text-amber-100">Pending</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-4xl font-bold text-amber-600">0</div>
+              <div className="text-4xl font-bold text-amber-600">{pendingCount}</div>
             </CardContent>
           </Card>
         </div>
 
         <div className="space-y-4">
-          <h2 className="text-2xl">Completed Readings</h2>
+          <h2 className="text-2xl">Your Readings</h2>
           {readings.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">
-                <p className="text-muted-foreground">No completed readings yet</p>
+                <p className="text-muted-foreground">No readings yet</p>
               </CardContent>
             </Card>
           ) : (
@@ -130,6 +133,11 @@ export function MyReadings() {
                           <Badge className={categoryColors[category] || categoryColors.general}>
                             {category}
                           </Badge>
+                          {!reading.interpretation && (
+                            <Badge className="bg-amber-500/10 text-amber-700 border-amber-200">
+                              Pending
+                            </Badge>
+                          )}
                         </CardDescription>
                       </div>
                     </div>
@@ -151,7 +159,7 @@ export function MyReadings() {
                     <div>
                       <p className="text-sm font-medium mb-2">Reading Summary:</p>
                       <p className="text-sm text-muted-foreground line-clamp-3">
-                        {reading.interpretation}
+                        {reading.interpretation || 'Your reading is being prepared by the reader. Check back soon.'}
                       </p>
                     </div>
 

@@ -16,7 +16,7 @@ type QueueStatus = 'pending' | 'processing' | 'completed';
 interface Reading {
   id: number;
   title: string;
-  interpretation: string;
+  interpretation: string | null;
   createdAt: string;
   updatedAt: string;
   user: {
@@ -90,7 +90,12 @@ export const AdminDashboard: React.FC = () => {
     localStorage.setItem('tarot_admin_statuses', JSON.stringify(statuses));
   }, [statuses]);
 
-  const getStatus = (readingId: number): QueueStatus => statuses[readingId] || 'pending';
+  const getStatus = (readingId: number): QueueStatus => {
+    if (statuses[readingId] === 'processing') return 'processing';
+    const reading = readings.find(r => r.id === readingId);
+    if (reading?.interpretation) return 'completed';
+    return 'pending';
+  };
 
   const fetchSubmissions = async () => {
     if (!token) return;
@@ -129,7 +134,7 @@ export const AdminDashboard: React.FC = () => {
     setSelectedCards([]);
     setAgentResults([]);
     setPipelineProgress(0);
-    setHarmonisedReading(getStatus(reading.id) === 'completed' ? reading.interpretation : '');
+    setHarmonisedReading(reading.interpretation ?? '');
     setDetectedCards([]);
   };
 
@@ -213,7 +218,7 @@ export const AdminDashboard: React.FC = () => {
     updateStatus(selectedReading.id, 'processing');
 
     try {
-      const results = await Promise.all(
+      await Promise.all(
         agentNames.map(async (agentName, index) => {
           const result = await buildAgentResult(agentName, selectedReading);
           setAgentResults((current) => [...current, result]);
