@@ -1,0 +1,8 @@
+/* Cinzel — elegant serif for headings (mystical, readable for 25–55) */
+/* Inter  — clean modern sans-serif for body text                      */
+/* Both loaded via Google Fonts in index.html                          */
+
+:root {
+  --font-heading: 'Cinzel', Georgia, 'Times New Roman', serif;
+  --font-body:    'Inter', system-ui, -apple-system, sans-serif;
+}
