@@ -1,57 +1,52 @@
-# Build stage
+# Build stage — full install, compile, generate Prisma client, then prune devDeps
 FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# OpenSSL is required so Prisma can detect the correct binary target during generation
+# OpenSSL required for Prisma to detect the correct query-engine binary
 RUN apk add --no-cache openssl
 
-# Copy package files
 COPY package*.json ./
 
-# Install dependencies
+# Install all deps (including devDeps needed for tsc + prisma CLI)
 RUN npm ci
 
-# Copy source code
 COPY . .
 
-# Build TypeScript
+# Compile TypeScript
 RUN npm run build
 
-# Generate Prisma client
+# Generate Prisma client (needs prisma CLI from devDeps + OpenSSL)
 RUN npm run prisma:generate
 
-# Production stage
+# Drop devDeps so the copied node_modules is production-only
+RUN npm prune --omit=dev
+
+# Production stage — no npm install, no postinstall scripts
 FROM node:20-alpine
 
 WORKDIR /app
 
-# Install dumb-init and OpenSSL for Prisma
+# dumb-init for correct signal handling; openssl for Prisma query engine at runtime
 RUN apk add --no-cache dumb-init openssl
 
-# Copy package files
-COPY package*.json ./
+# Copy pruned node_modules (includes @prisma/client + .prisma engine binaries,
+# fully generated — no postinstall re-run needed)
+COPY --from=builder /app/node_modules ./node_modules
 
-# Install production dependencies only
-RUN npm ci --only=production
-
-# Copy built application from builder
+# Copy compiled application
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY prisma ./prisma
 
-# Set environment
+# Copy Prisma schema (needed for migrate deploy at startup if required)
+COPY --from=builder /app/prisma ./prisma
+
 ENV NODE_ENV=production
 
-# Expose port
 EXPOSE 3000
 
-# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD node -e "require('http').get('http://localhost:3000/api/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
 
-# Use dumb-init to handle signals properly
 ENTRYPOINT ["dumb-init", "--"]
 
-# Start application
 CMD ["node", "dist/index.js"]
