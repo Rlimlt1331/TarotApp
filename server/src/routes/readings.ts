@@ -1,32 +1,10 @@
-import { Router, Request, Response } from 'express';
-import jwt from 'jsonwebtoken';
+import { Router, Response } from 'express';
 import { prisma } from '../index.js';
 import { GeminiGenerationError, generateReading, generateReadingAnalysis, generateAdvancedReading } from '../services/geminiService.js';
 import { verifyAdmin } from '../middleware/verifyAdmin.js';
+import { verifyToken, AuthRequest } from '../middleware/verifyToken.js';
 
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'your_secret_key';
-
-interface AuthRequest extends Request {
-  userId?: number;
-  userRole?: string;
-}
-
-// Middleware to verify JWT
-const verifyToken = (req: AuthRequest, res: Response, next: Function) => {
-  try {
-    const token = req.headers.authorization?.replace('Bearer ', '');
-    if (!token) {
-      return res.status(401).json({ error: 'No token provided' });
-    }
-
-    const decoded: any = jwt.verify(token, JWT_SECRET);
-    req.userId = decoded.userId;
-    next();
-  } catch (error: any) {
-    res.status(401).json({ error: 'Invalid token' });
-  }
-};
 
 // Generate advanced reading draft without saving
 router.post('/generate-draft', verifyToken, async (req: AuthRequest, res: Response) => {
@@ -119,7 +97,7 @@ router.get('/', verifyToken, async (req: AuthRequest, res: Response) => {
 });
 
 // Get all submissions (admin only)
-router.get('/admin/submissions', verifyAdmin, async (req: AuthRequest, res: Response) => {
+router.get('/admin/submissions', verifyAdmin, async (_req: AuthRequest, res: Response) => {
   try {
     const readings = await prisma.reading.findMany({
       include: {

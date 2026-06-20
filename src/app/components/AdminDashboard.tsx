@@ -149,7 +149,6 @@ export const AdminDashboard: React.FC = () => {
     const reader = new FileReader();
     reader.onloadend = () => {
       setSpreadImage(reader.result as string);
-      runPipeline(reader.result as string);
     };
     reader.readAsDataURL(file);
   };

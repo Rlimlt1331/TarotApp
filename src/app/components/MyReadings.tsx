@@ -7,6 +7,7 @@ import { Calendar, Sparkles, Star } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { apiClient } from '../../lib/api-client';
+import { ReadingFeedback } from './ReadingFeedback';
 import { toast } from 'sonner';
 
 interface BackendReading {
@@ -205,6 +206,8 @@ export function MyReadings() {
                     {selectedReading.interpretation}
                   </p>
                 </div>
+
+                <ReadingFeedback readingId={selectedReading.id} />
               </div>
             </>
           )}

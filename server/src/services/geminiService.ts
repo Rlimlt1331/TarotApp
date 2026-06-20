@@ -4,7 +4,7 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 const PRIMARY_GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite';
 const GEMINI_MODELS = [
   PRIMARY_GEMINI_MODEL,
-  ...(process.env.GEMINI_FALLBACK_MODELS || 'gemini-3.gemini-2.5-flash,gpt-4.0-turbo')
+  ...(process.env.GEMINI_FALLBACK_MODELS || 'gemini-2.5-flash,gemini-1.5-flash')
     .split(',')
     .map((model) => model.trim())
     .filter(Boolean),
@@ -281,16 +281,18 @@ export async function generateReading(
 }
 
 function generatePlaceholderInterpretation(cards: Card[], title?: string): string {
+  const titleLine = title ? ` for "${title}"` : '';
+
   if (cards.length === 0) {
-    return `This reading could not reach Gemini, but the uploaded spread still invites reflection.
+    return `This reading${titleLine} could not reach Gemini, but the uploaded spread still invites reflection.
 
 Look at the strongest visual symbols in the spread, the cards that feel most central, and the story created by their positions. The clearest guidance is to name the present tension, notice what pattern is repeating, and choose one grounded action that restores agency.`;
   }
 
   const cardNames = cards.map((c) => c.name).join(', ');
-  return `This reading features the following cards: ${cardNames}. 
+  return `This reading${titleLine} features the following cards: ${cardNames}.
 
-Each card carries its own symbolism and energy. In this spread, ${cards[0].name} in the ${cards[0].position} position sets the foundation or focus. 
+Each card carries its own symbolism and energy. In this spread, ${cards[0].name} in the ${cards[0].position} position sets the foundation or focus.
 
 This reading invites you to reflect on the interconnected messages these cards bring together, considering both their individual meanings and how they interact as a unified whole.`;
 }

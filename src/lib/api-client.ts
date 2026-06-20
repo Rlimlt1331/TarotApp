@@ -3,21 +3,19 @@
 
 import { API_URL } from '../app/config/api';
 
-class ApiClient {
-  private token: string | null = null;
+const TOKEN_KEY = 'tarot_token';
 
-  constructor() {
-    this.token = localStorage.getItem('token');
+class ApiClient {
+  private getToken(): string | null {
+    return localStorage.getItem(TOKEN_KEY);
   }
 
   setToken(token: string) {
-    this.token = token;
-    localStorage.setItem('token', token);
+    localStorage.setItem(TOKEN_KEY, token);
   }
 
   clearToken() {
-    this.token = null;
-    localStorage.removeItem('token');
+    localStorage.removeItem(TOKEN_KEY);
   }
 
   private getHeaders(): Record<string, string> {
@@ -25,8 +23,9 @@ class ApiClient {
       'Content-Type': 'application/json',
     };
 
-    if (this.token) {
-      headers.Authorization = `Bearer ${this.token}`;
+    const token = this.getToken();
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
     }
 
     return headers;
