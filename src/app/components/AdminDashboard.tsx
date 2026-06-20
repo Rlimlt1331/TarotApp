@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
+import { Textarea } from './ui/textarea';
 import { Progress } from './ui/progress';
 import { useAuth } from '../context/AuthContext';
 import { API_URL } from '../config/api';
@@ -80,6 +81,7 @@ export const AdminDashboard: React.FC = () => {
   const [pipelineProgress, setPipelineProgress] = useState(0);
   const [harmonisedReading, setHarmonisedReading] = useState('');
   const [detectedCards, setDetectedCards] = useState<DetectedCard[]>([]);
+  const [submitting, setSubmitting] = useState(false);
   const { token } = useAuth();
 
   useEffect(() => {
@@ -140,6 +142,44 @@ export const AdminDashboard: React.FC = () => {
 
   const updateStatus = (readingId: number, status: QueueStatus) => {
     setStatuses((current) => ({ ...current, [readingId]: status }));
+  };
+
+  const submitReading = async () => {
+    if (!selectedReading || !harmonisedReading.trim()) return;
+    setSubmitting(true);
+    try {
+      const response = await fetch(
+        `${API_URL}/readings/admin/submissions/${selectedReading.id}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ interpretation: harmonisedReading }),
+        }
+      );
+
+      if (!response.ok) {
+        const contentType = response.headers.get('content-type') || '';
+        const message = contentType.includes('application/json')
+          ? (await response.json()).error
+          : await response.text();
+        throw new Error(message || 'Failed to submit reading');
+      }
+
+      const updatedReading = await response.json();
+      setSelectedReading(updatedReading);
+      setReadings((current) =>
+        current.map((r) => (r.id === updatedReading.id ? updatedReading : r))
+      );
+      updateStatus(selectedReading.id, 'completed');
+      toast.success('Reading submitted to requester');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to submit reading');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const getContextValue = (position: string) => {
@@ -229,37 +269,34 @@ export const AdminDashboard: React.FC = () => {
 
       setPipelineProgress(92);
 
-      const response = await fetch(`${API_URL}/readings/admin/submissions/${selectedReading.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          spreadImage: image,
-          cards: cardsForReading,
-        }),
-      });
+      const response = await fetch(
+        `${API_URL}/readings/admin/submissions/${selectedReading.id}/generate`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            spreadImage: image,
+            cards: cardsForReading,
+          }),
+        }
+      );
 
       if (!response.ok) {
         const contentType = response.headers.get('content-type') || '';
         const message = contentType.includes('application/json')
           ? (await response.json()).error
           : await response.text();
-        throw new Error(message || 'Pipeline completed, but saving the reading failed');
+        throw new Error(message || 'Pipeline completed, but generating the reading failed');
       }
 
-      const updatedReading = await response.json();
-      const finalReading = updatedReading.interpretation;
-      setDetectedCards(updatedReading.detectedCards || []);
-      setHarmonisedReading(finalReading);
-      setSelectedReading(updatedReading);
-      setReadings((current) => current.map((reading) => (
-        reading.id === updatedReading.id ? updatedReading : reading
-      )));
-      updateStatus(selectedReading.id, 'completed');
+      const generated = await response.json();
+      setDetectedCards(generated.detectedCards || []);
+      setHarmonisedReading(generated.interpretation);
       setPipelineProgress(100);
-      toast.success('Multi-agent reading completed');
+      toast.success('Reading generated — review and click "Submit Reading" to send to requester');
     } catch (error: any) {
       toast.error(error.message || 'Failed to run AI pipeline');
       updateStatus(selectedReading.id, 'pending');
@@ -478,10 +515,35 @@ export const AdminDashboard: React.FC = () => {
                     <Sparkles className="size-5" />
                     Harmonised Reading
                   </CardTitle>
-                  <CardDescription>Saved to the submission for the requester and admin record.</CardDescription>
+                  <CardDescription>
+                    {getStatus(selectedReading.id) === 'completed'
+                      ? 'Submitted to the requester.'
+                      : 'Review and edit the reading before submitting to the requester.'}
+                  </CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <p className="whitespace-pre-wrap text-sm leading-relaxed">{harmonisedReading}</p>
+                <CardContent className="space-y-4">
+                  <Textarea
+                    value={harmonisedReading}
+                    onChange={(e) => setHarmonisedReading(e.target.value)}
+                    className="min-h-[220px] text-sm leading-relaxed"
+                    disabled={getStatus(selectedReading.id) === 'completed' || submitting}
+                  />
+                  {getStatus(selectedReading.id) !== 'completed' && (
+                    <Button
+                      onClick={submitReading}
+                      disabled={submitting || !harmonisedReading.trim()}
+                      className="w-full"
+                    >
+                      <CheckCircle2 className="size-4 mr-2" />
+                      {submitting ? 'Submitting…' : 'Submit Reading to Requester'}
+                    </Button>
+                  )}
+                  {getStatus(selectedReading.id) === 'completed' && (
+                    <div className="flex items-center gap-2 text-sm text-green-600">
+                      <CheckCircle2 className="size-4" />
+                      Reading submitted — visible to requester under My Readings.
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}

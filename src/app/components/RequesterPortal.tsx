@@ -123,6 +123,7 @@ export function RequesterPortal({ onShowAuthModal }: { onShowAuthModal: () => vo
         body: JSON.stringify({
           title: question,
           cards,
+          skipGeneration: true,
         }),
       });
 

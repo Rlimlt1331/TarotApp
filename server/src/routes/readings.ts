@@ -33,14 +33,38 @@ router.post('/generate-draft', verifyToken, async (req: AuthRequest, res: Respon
   }
 });
 
-// Create a new reading with Gemini-generated interpretation
+// Create a new reading — with skipGeneration:true, saves as pending (no Gemini call)
 router.post('/', verifyToken, async (req: AuthRequest, res: Response) => {
   try {
-    const { cards = [], title, spreadImage, image } = req.body;
+    const { cards = [], title, spreadImage, image, skipGeneration } = req.body;
     const userId = req.userId;
 
     if (!Array.isArray(cards)) {
       return res.status(400).json({ error: 'Cards must be an array' });
+    }
+
+    // Requester portal submissions skip Gemini — reader processes them later
+    if (skipGeneration) {
+      const reading = await prisma.reading.create({
+        data: {
+          userId: userId!,
+          title: title || 'Untitled Reading',
+          interpretation: null,
+          ...(cards.length > 0
+            ? {
+                cards: {
+                  create: cards.map((card: any) => ({
+                    name: card.name,
+                    position: card.position,
+                    meaning: card.meaning,
+                  })),
+                },
+              }
+            : {}),
+        },
+        include: { cards: true },
+      });
+      return res.status(201).json(reading);
     }
 
     if (cards.length === 0 && !spreadImage && !image) {
@@ -67,9 +91,7 @@ router.post('/', verifyToken, async (req: AuthRequest, res: Response) => {
             }
           : {}),
       },
-      include: {
-        cards: true,
-      },
+      include: { cards: true },
     });
 
     res.status(201).json(reading);
@@ -114,6 +136,38 @@ router.get('/admin/submissions', verifyAdmin, async (_req: AuthRequest, res: Res
   } catch (error: any) {
     console.error('Get submissions error:', error);
     res.status(500).json({ error: 'Failed to fetch submissions' });
+  }
+});
+
+// Generate reading preview without saving (admin only)
+router.post('/admin/submissions/:id/generate', verifyAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { spreadImage, image, cards = [] } = req.body;
+
+    const reading = await prisma.reading.findUnique({
+      where: { id: parseInt(id) },
+      include: { cards: true },
+    });
+
+    if (!reading) {
+      return res.status(404).json({ error: 'Reading not found' });
+    }
+
+    const selectedCards = Array.isArray(cards) && cards.length > 0 ? cards : reading.cards;
+    const generated = await generateReadingAnalysis(
+      selectedCards,
+      reading.title || undefined,
+      spreadImage || image
+    );
+
+    res.json(generated);
+  } catch (error: any) {
+    console.error('Generate preview error:', error);
+    if (error instanceof GeminiGenerationError) {
+      return res.status(error.status).json({ error: error.message, retryDelay: error.retryDelay });
+    }
+    res.status(500).json({ error: 'Failed to generate reading preview' });
   }
 });
 
