@@ -63,7 +63,7 @@ function AppContent() {
   };
 
   return (
-    <div className="size-full min-h-screen bg-background">
+    <div className="size-full min-h-screen">
       {showProfileSetup ? (
         <UserProfile onComplete={() => setShowProfileSetup(false)} />
       ) : (
