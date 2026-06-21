@@ -41,3 +41,6 @@ yarn-error.log*
 .cache/
 tmp/
 temp/
+
+# Claude Code session data (worktrees, memory, transcripts)
+.claude/
