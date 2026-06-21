@@ -1,18 +1,16 @@
 import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Badge } from './ui/badge';
-import { Combobox } from './ui/combobox';
 import { useTarot } from '../context/TarotContext';
 import { useAuth } from '../context/AuthContext';
 import { usePendingSubmission } from '../context/PendingSubmissionContext';
 import { API_URL } from '../config/api';
-import { HOROSCOPES, COUNTRIES, SUGGESTED_QUESTIONS } from '../data/mockData';
+import { HOROSCOPES, SUGGESTED_QUESTIONS } from '../data/mockData';
 import { ReadingCategory, Gender } from '../types';
 import { Sparkles, Heart, Briefcase, Activity } from 'lucide-react';
 import { toast } from 'sonner';
@@ -24,11 +22,8 @@ export function RequesterPortal({ onShowAuthModal }: { onShowAuthModal: () => vo
   const [selectedCategory, setSelectedCategory] = useState<ReadingCategory>('relationships');
   const [customQuestion, setCustomQuestion] = useState('');
   const [selectedQuestion, setSelectedQuestion] = useState('');
-  const [additionalNotes, setAdditionalNotes] = useState('');
   const [horoscope, setHoroscope] = useState(currentUser?.horoscope || '');
   const [gender, setGender] = useState<Gender | ''>(currentUser?.gender || '');
-  const [country, setCountry] = useState(currentUser?.country || '');
-  const [occupation, setOccupation] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -38,9 +33,6 @@ export function RequesterPortal({ onShowAuthModal }: { onShowAuthModal: () => vo
       setCustomQuestion(data.question || '');
       setHoroscope(data.horoscope);
       setGender(data.gender);
-      setCountry(data.country);
-      setOccupation(data.occupation || '');
-      setAdditionalNotes(data.additionalNotes || '');
       toast.success('Your form data has been restored!');
       clearPendingSubmission();
     }
@@ -74,11 +66,6 @@ export function RequesterPortal({ onShowAuthModal }: { onShowAuthModal: () => vo
       return;
     }
 
-    if (!country) {
-      toast.error('Please select your country');
-      return;
-    }
-
     if (!user || !token) {
       setPendingSubmission({
         readingData: {
@@ -86,9 +73,6 @@ export function RequesterPortal({ onShowAuthModal }: { onShowAuthModal: () => vo
           question,
           horoscope,
           gender: gender as Gender,
-          country,
-          occupation,
-          additionalNotes,
         },
         timestamp: Date.now(),
       } as any);
@@ -116,9 +100,6 @@ export function RequesterPortal({ onShowAuthModal }: { onShowAuthModal: () => vo
           category: selectedCategory,
           horoscope,
           gender,
-          country,
-          occupation: occupation || undefined,
-          additionalNotes: additionalNotes || undefined,
         }),
       });
 
@@ -134,10 +115,7 @@ export function RequesterPortal({ onShowAuthModal }: { onShowAuthModal: () => vo
         question,
         userInfo: {
           horoscope: horoscope,
-          country: country,
           gender: gender as Gender,
-          occupation: occupation || undefined,
-          additionalNotes: additionalNotes || undefined,
         },
         isFreeReading: (currentUser?.readingsCount ?? 0) === 0,
       });
@@ -146,8 +124,6 @@ export function RequesterPortal({ onShowAuthModal }: { onShowAuthModal: () => vo
       toast.success((currentUser?.readingsCount ?? 0) === 0 ? 'Your free reading request has been submitted!' : 'Reading request submitted!');
       setCustomQuestion('');
       setSelectedQuestion('');
-      setAdditionalNotes('');
-      setOccupation('');
     } catch (error: any) {
       toast.error(error.message || 'Failed to submit reading request');
     } finally {
@@ -226,25 +202,6 @@ export function RequesterPortal({ onShowAuthModal }: { onShowAuthModal: () => vo
                   ))}
                 </div>
               </RadioGroup>
-            </CardContent>
-          </Card>
-
-          <Card className="tarot-card">
-            <CardHeader>
-              <CardTitle>Your Country</CardTitle>
-              <CardDescription>
-                Select your country (this will be shown to the reader as your geo-location)
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Combobox
-                options={COUNTRIES.map(c => ({ value: c, label: c }))}
-                value={country}
-                onValueChange={setCountry}
-                placeholder="Select your country..."
-                searchPlaceholder="Type to search countries..."
-                emptyText="No country found."
-              />
             </CardContent>
           </Card>
 
@@ -340,36 +297,6 @@ export function RequesterPortal({ onShowAuthModal }: { onShowAuthModal: () => vo
                     setCustomQuestion(e.target.value);
                     setSelectedQuestion('');
                   }}
-                  rows={3}
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="tarot-card">
-            <CardHeader>
-              <CardTitle>Additional Information (Optional)</CardTitle>
-              <CardDescription>
-                Help our readers provide more personalized insights
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="occupation">Occupation</Label>
-                <Input
-                  id="occupation"
-                  placeholder="e.g., Software Engineer"
-                  value={occupation}
-                  onChange={(e) => setOccupation(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="notes">Additional Notes</Label>
-                <Textarea
-                  id="notes"
-                  placeholder="Any additional context you'd like to share..."
-                  value={additionalNotes}
-                  onChange={(e) => setAdditionalNotes(e.target.value)}
                   rows={3}
                 />
               </div>

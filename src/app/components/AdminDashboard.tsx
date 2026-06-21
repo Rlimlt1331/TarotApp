@@ -76,7 +76,6 @@ const agentNames = [
   'Vision Agent',
   'Astrology Agent',
   'Tarot Interpretation Agent',
-  'Harmoniser Agent',
 ];
 
 const statusStyles: Record<QueueStatus, string> = {
@@ -286,7 +285,6 @@ export const AdminDashboard: React.FC = () => {
         'Vision Agent': 'Analysing card spread image…',
         'Astrology Agent': `Processing ${horoscope} energy…`,
         'Tarot Interpretation Agent': `Reading through the ${category} lens…`,
-        'Harmoniser Agent': 'Harmonising insights…',
       };
 
       await Promise.all(
@@ -355,12 +353,6 @@ export const AdminDashboard: React.FC = () => {
           summary: `Interpreted cards through the ${category} lens.`,
           confidence: 0.91,
           fullOutput: generated.tarotReading,
-        },
-        {
-          name: 'Harmoniser Agent',
-          summary: 'Merged tarot and astrology insights into one cohesive reading.',
-          confidence: 0.95,
-          fullOutput: generated.harmonizedReading,
         },
       ]);
 
