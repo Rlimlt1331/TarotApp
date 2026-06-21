@@ -8,6 +8,10 @@ RUN apk add --no-cache openssl
 
 COPY package*.json ./
 
+# Copy Prisma schema before npm ci so the postinstall prisma generate
+# runs with the correct schema and produces accurate TypeScript types
+COPY prisma ./prisma
+
 # Install all deps (including devDeps needed for tsc + prisma CLI)
 RUN npm ci
 
