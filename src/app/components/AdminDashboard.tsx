@@ -7,7 +7,7 @@ import { Textarea } from './ui/textarea';
 import { Progress } from './ui/progress';
 import { useAuth } from '../context/AuthContext';
 import { API_URL } from '../config/api';
-import { ArrowLeft, Brain, Calendar, CheckCircle2, ImageUp, Sparkles, Star } from 'lucide-react';
+import { ArrowLeft, Brain, Calendar, CheckCircle2, ImageUp, Sparkles, Star, User } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 
