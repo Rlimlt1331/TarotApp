@@ -16,9 +16,10 @@ interface Feedback {
 
 interface ReadingFeedbackProps {
   submissionId: number;
+  onClose?: () => void;
 }
 
-export const ReadingFeedback: React.FC<ReadingFeedbackProps> = ({ submissionId }) => {
+export const ReadingFeedback: React.FC<ReadingFeedbackProps> = ({ submissionId, onClose }) => {
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [rating, setRating] = useState(0);
   const [hoveredRating, setHoveredRating] = useState(0);
@@ -81,6 +82,7 @@ export const ReadingFeedback: React.FC<ReadingFeedbackProps> = ({ submissionId }
         const data = await response.json();
         setFeedback(data);
         toast.success('Feedback saved successfully!');
+        onClose?.();
       } else {
         throw new Error('Failed to save feedback');
       }

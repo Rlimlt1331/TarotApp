@@ -265,7 +265,7 @@ export function MyReadings() {
                 )}
 
                 {selectedSubmission.reading && (
-                  <ReadingFeedback submissionId={selectedSubmission.id} />
+                  <ReadingFeedback submissionId={selectedSubmission.id} onClose={() => setSelectedSubmission(null)} />
                 )}
               </div>
             </>
