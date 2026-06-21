@@ -121,7 +121,7 @@ router.post('/admin/:id/generate', verifyAdmin, async (req: AuthRequest, res: Re
 router.put('/admin/:id', verifyAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const { astrologyReading, tarotReading, harmonisedReading, detectedCardNames } = req.body;
+    const { astrologyReading, tarotReading, harmonisedReading, detectedCards: detectedCardObjects } = req.body;
 
     const submission = await prisma.submission.findUnique({
       where: { id: parseInt(id) },
@@ -143,13 +143,14 @@ router.put('/admin/:id', verifyAdmin, async (req: AuthRequest, res: Response) =>
         },
       });
 
-      if (Array.isArray(detectedCardNames) && detectedCardNames.length > 0) {
+      if (Array.isArray(detectedCardObjects) && detectedCardObjects.length > 0) {
         await prisma.card.deleteMany({ where: { readingId: submission.reading.id } });
         await prisma.card.createMany({
-          data: detectedCardNames.map((name: string, index: number) => ({
+          data: detectedCardObjects.map((card: { name: string; orientation?: string }, index: number) => ({
             readingId: submission.reading!.id,
-            name,
+            name: card.name,
             position: `Card ${index + 1}`,
+            orientation: card.orientation || null,
           })),
         });
       }
@@ -164,12 +165,13 @@ router.put('/admin/:id', verifyAdmin, async (req: AuthRequest, res: Response) =>
         },
       });
 
-      if (Array.isArray(detectedCardNames) && detectedCardNames.length > 0) {
+      if (Array.isArray(detectedCardObjects) && detectedCardObjects.length > 0) {
         await prisma.card.createMany({
-          data: detectedCardNames.map((name: string, index: number) => ({
+          data: detectedCardObjects.map((card: { name: string; orientation?: string }, index: number) => ({
             readingId: newReading.id,
-            name,
+            name: card.name,
             position: `Card ${index + 1}`,
+            orientation: card.orientation || null,
           })),
         });
       }

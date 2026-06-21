@@ -7,7 +7,7 @@ import { Textarea } from './ui/textarea';
 import { Progress } from './ui/progress';
 import { useAuth } from '../context/AuthContext';
 import { API_URL } from '../config/api';
-import { ArrowLeft, Brain, Calendar, CheckCircle2, ImageUp, MapPin, Sparkles, Star, User } from 'lucide-react';
+import { ArrowLeft, Brain, Calendar, CheckCircle2, ImageUp, Sparkles, Star } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -17,6 +17,7 @@ interface DetectedCardRecord {
   id: number;
   name: string;
   position: string | null;
+  orientation: string | null;
 }
 
 interface AgentReading {
@@ -67,6 +68,7 @@ interface AgentResult {
 interface DetectedCard {
   name: string;
   position: string;
+  orientation?: string;
   confidence?: string;
   visualEvidence?: string;
 }
@@ -150,21 +152,12 @@ export const AdminDashboard: React.FC = () => {
   const selectSubmission = (submission: Submission) => {
     setSelectedSubmission(submission);
     setSpreadImage('');
-    setSelectedCards([]);
     setAgentResults([]);
     setPipelineProgress(0);
     setHarmonisedReading(submission.reading?.harmonisedReading || '');
     setAstrologyReading(submission.reading?.astrologyReading || '');
     setTarotReading(submission.reading?.tarotReading || '');
-    if (submission.reading?.detectedCards) {
-      setDetectedCards(submission.reading.detectedCards.map(c => ({
-        name: c.name,
-        position: c.position || '',
-        confidence: 'Saved',
-      })));
-    } else {
-      setDetectedCards([]);
-    }
+    setDetectedCards([]);
   };
 
   const updateStatus = (submissionId: number, status: QueueStatus) => {
@@ -187,7 +180,7 @@ export const AdminDashboard: React.FC = () => {
             astrologyReading,
             tarotReading,
             harmonisedReading,
-            detectedCardNames: detectedCards.map((c) => c.name),
+            detectedCards: detectedCards.map((c) => ({ name: c.name, orientation: c.orientation })),
           }),
         }
       );
@@ -304,7 +297,7 @@ export const AdminDashboard: React.FC = () => {
       }
 
       const generated = await response.json();
-      // generated: { detectedCards: string[], tarotReading: string, horoscopeReading: string, harmonizedReading: string }
+      // generated: { detectedCards: {name, orientation}[], tarotReading, horoscopeReading, harmonizedReading }
 
       // Phase 3: replace placeholder agent results with real content
       setAgentResults([
@@ -323,8 +316,9 @@ export const AdminDashboard: React.FC = () => {
       ]);
 
       setDetectedCards(
-        (generated.detectedCards as string[]).map((name, index) => ({
-          name,
+        (generated.detectedCards as Array<{ name: string; orientation?: string }>).map((card, index) => ({
+          name: card.name,
+          orientation: card.orientation,
           position: `Card ${index + 1}`,
           confidence: 'Detected by AI',
         }))
@@ -353,6 +347,16 @@ export const AdminDashboard: React.FC = () => {
 
   if (selectedSubmission) {
     const status = getStatus(selectedSubmission.id);
+    const isCompleted = status === 'completed';
+
+    // Cards to show: prefer freshly-detected (current run), fall back to DB-stored
+    const cardsToDisplay: DetectedCard[] = detectedCards.length > 0
+      ? detectedCards
+      : (selectedSubmission.reading?.detectedCards || []).map((c) => ({
+          name: c.name,
+          position: c.position || '',
+          orientation: c.orientation || undefined,
+        }));
 
     return (
       <div className="container mx-auto px-4 py-8">
@@ -362,6 +366,7 @@ export const AdminDashboard: React.FC = () => {
         </Button>
 
         <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
+          {/* LEFT COLUMN */}
           <div className="space-y-4">
             <Card>
               <CardHeader>
@@ -382,10 +387,6 @@ export const AdminDashboard: React.FC = () => {
                   <Star className="size-4 text-muted-foreground" />
                   <span>{getContextValue('Horoscope')}</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <MapPin className="size-4 text-muted-foreground" />
-                  <span>{getContextValue('Country')}</span>
-                </div>
                 <div>
                   <p className="font-medium mb-1">Question</p>
                   <p className="text-muted-foreground">{selectedSubmission.question}</p>
@@ -395,43 +396,45 @@ export const AdminDashboard: React.FC = () => {
                   <div className="flex flex-wrap gap-2">
                     <Badge variant="outline">Category: {getContextValue('Category')}</Badge>
                     <Badge variant="outline">Horoscope: {getContextValue('Horoscope')}</Badge>
-                    <Badge variant="outline">Country: {getContextValue('Country')}</Badge>
                     <Badge variant="outline">Gender: {getContextValue('Gender')}</Badge>
-                    <Badge variant="outline">Occupation: {getContextValue('Occupation')}</Badge>
-                    <Badge variant="outline">Notes: {getContextValue('Additional Notes')}</Badge>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <ImageUp className="size-5" />
-                  Card Spread
-                </CardTitle>
-                <CardDescription>Uploading a spread photo starts the four-agent pipeline.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Input type="file" accept="image/*" onChange={handleImageUpload} disabled={pipelineRunning} />
-                {spreadImage && (
-                  <img src={spreadImage} alt="Uploaded card spread" className="w-full rounded-md border object-cover" />
-                )}
-                <Button
-                  type="button"
-                  onClick={() => runPipeline(spreadImage || undefined)}
-                  disabled={pipelineRunning || !spreadImage}
-                  className="w-full"
-                >
-                  <Sparkles className="size-4 mr-2" />
-                  Generate Reading
-                </Button>
-              </CardContent>
-            </Card>
+            {!isCompleted && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <ImageUp className="size-5" />
+                    Card Spread
+                  </CardTitle>
+                  <CardDescription>Uploading a spread photo starts the AI pipeline.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <Input type="file" accept="image/*" onChange={handleImageUpload} disabled={pipelineRunning} />
+                  {spreadImage && (
+                    <img src={spreadImage} alt="Uploaded card spread" className="w-full rounded-md border object-cover" />
+                  )}
+                  <Button
+                    type="button"
+                    onClick={() => runPipeline(spreadImage || undefined)}
+                    disabled={pipelineRunning || !spreadImage}
+                    className="w-full"
+                  >
+                    <Sparkles className="size-4 mr-2" />
+                    Generate Reading
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
           </div>
 
+          {/* RIGHT COLUMN */}
           <div className="space-y-4">
-            {selectedSubmission.reading?.detectedCards && selectedSubmission.reading.detectedCards.length > 0 && (
+
+            {/* Unified Cards from Reading Session */}
+            {(cardsToDisplay.length > 0 || (pipelineRunning && !isCompleted)) && (
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2 text-base">
@@ -440,97 +443,113 @@ export const AdminDashboard: React.FC = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedSubmission.reading.detectedCards.map((card, i) => (
-                      <Badge key={i} variant="outline">{card.name}</Badge>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Brain className="size-5" />
-                  Multi-Agent Pipeline
-                </CardTitle>
-                <CardDescription>Gemini reads the photo or selected cards, then saves the final interpretation.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {(pipelineRunning || pipelineProgress > 0) && (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span>{pipelineRunning ? 'Agents processing...' : 'Pipeline complete'}</span>
-                      <span>{Math.round(pipelineProgress)}%</span>
-                    </div>
-                    <Progress value={pipelineProgress} />
-                  </div>
-                )}
-
-                <div className="space-y-4">
-                  {agentNames.map((agentName) => {
-                    const result = agentResults.find((agent) => agent.name === agentName);
-
-                    return (
-                      <div key={agentName} className="rounded-md border p-4 space-y-3">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="font-medium">{agentName}</p>
-                          {result ? (
-                            <Badge variant="outline">{Math.round(result.confidence * 100)}%</Badge>
-                          ) : (
-                            <Badge variant="secondary">{pipelineRunning ? 'Running…' : 'Waiting'}</Badge>
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          {result?.summary || 'Upload a spread photo to start.'}
-                        </p>
-                        {result?.fullOutput && (
-                          <div className="rounded border bg-muted/30 p-3">
-                            <p className="text-sm leading-relaxed whitespace-pre-wrap">{result.fullOutput}</p>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-
-            {(pipelineRunning || detectedCards.length > 0 || harmonisedReading) && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <ImageUp className="size-5" />
-                    Detected Cards
-                  </CardTitle>
-                  <CardDescription>Use this to verify that Gemini is reading the uploaded image.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {pipelineRunning && detectedCards.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Waiting for Gemini vision output...</p>
-                  ) : detectedCards.length > 0 ? (
-                    <div className="space-y-3">
-                      {detectedCards.map((card, index) => (
-                        <div key={`${card.position}-${card.name}-${index}`} className="rounded-md border p-3">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Badge variant="secondary">{index + 1}</Badge>
-                            <p className="font-medium">{card.name}</p>
-                            <Badge variant="outline">{card.position}</Badge>
-                            {card.confidence && <Badge>{card.confidence}</Badge>}
-                          </div>
-                          {card.visualEvidence && (
-                            <p className="mt-2 text-sm text-muted-foreground">{card.visualEvidence}</p>
+                  {pipelineRunning && cardsToDisplay.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Detecting cards from image…</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {cardsToDisplay.map((card, index) => (
+                        <div key={`${card.name}-${index}`} className="flex flex-wrap items-center gap-2 rounded-md border p-3">
+                          <Badge variant="secondary">{index + 1}</Badge>
+                          <p className="font-medium">{card.name}</p>
+                          {card.orientation && (
+                            <Badge variant={card.orientation === 'upright' ? 'default' : 'outline'}>
+                              {card.orientation}
+                            </Badge>
                           )}
                         </div>
                       ))}
                     </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">No cards were confidently identified from the image.</p>
                   )}
                 </CardContent>
               </Card>
             )}
 
+            {/* COMPLETED: show stored agent readings from DB */}
+            {isCompleted && selectedSubmission.reading && (
+              <>
+                {selectedSubmission.reading.tarotReading && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Brain className="size-5" />
+                        Tarot Interpretation Agent
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                        {selectedSubmission.reading.tarotReading}
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
+                {selectedSubmission.reading.astrologyReading && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Star className="size-5" />
+                        Astrology Agent
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                        {selectedSubmission.reading.astrologyReading}
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
+              </>
+            )}
+
+            {/* PENDING/PROCESSING: live agent pipeline */}
+            {!isCompleted && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Brain className="size-5" />
+                    Multi-Agent Pipeline
+                  </CardTitle>
+                  <CardDescription>Gemini reads the photo and generates the interpretation.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {(pipelineRunning || pipelineProgress > 0) && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span>{pipelineRunning ? 'Agents processing...' : 'Pipeline complete'}</span>
+                        <span>{Math.round(pipelineProgress)}%</span>
+                      </div>
+                      <Progress value={pipelineProgress} />
+                    </div>
+                  )}
+                  <div className="space-y-4">
+                    {agentNames.map((agentName) => {
+                      const result = agentResults.find((agent) => agent.name === agentName);
+                      return (
+                        <div key={agentName} className="rounded-md border p-4 space-y-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="font-medium">{agentName}</p>
+                            {result ? (
+                              <Badge variant="outline">{Math.round(result.confidence * 100)}%</Badge>
+                            ) : (
+                              <Badge variant="secondary">{pipelineRunning ? 'Running…' : 'Waiting'}</Badge>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {result?.summary || 'Upload a spread photo to start.'}
+                          </p>
+                          {result?.fullOutput && (
+                            <div className="rounded border bg-muted/30 p-3">
+                              <p className="text-sm leading-relaxed whitespace-pre-wrap">{result.fullOutput}</p>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Harmonised Reading */}
             {harmonisedReading && (
               <Card className="border-primary">
                 <CardHeader>
@@ -539,7 +558,7 @@ export const AdminDashboard: React.FC = () => {
                     Harmonised Reading
                   </CardTitle>
                   <CardDescription>
-                    {getStatus(selectedSubmission.id) === 'completed'
+                    {isCompleted
                       ? 'Submitted to the requester.'
                       : 'Review and edit the reading before submitting to the requester.'}
                   </CardDescription>
@@ -549,9 +568,9 @@ export const AdminDashboard: React.FC = () => {
                     value={harmonisedReading}
                     onChange={(e) => setHarmonisedReading(e.target.value)}
                     className="min-h-[220px] text-sm leading-relaxed"
-                    disabled={getStatus(selectedSubmission.id) === 'completed' || submitting}
+                    disabled={isCompleted || submitting}
                   />
-                  {getStatus(selectedSubmission.id) !== 'completed' && (
+                  {!isCompleted && (
                     <Button
                       onClick={submitReading}
                       disabled={submitting || !harmonisedReading.trim()}
@@ -561,7 +580,7 @@ export const AdminDashboard: React.FC = () => {
                       {submitting ? 'Submitting…' : 'Submit Reading to Requester'}
                     </Button>
                   )}
-                  {getStatus(selectedSubmission.id) === 'completed' && (
+                  {isCompleted && (
                     <div className="flex items-center gap-2 text-sm text-green-600">
                       <CheckCircle2 className="size-4" />
                       Reading submitted — visible to requester under My Readings.

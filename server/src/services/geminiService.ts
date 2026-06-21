@@ -24,6 +24,7 @@ interface ReadingImage {
 export interface DetectedCard {
   name: string;
   position: string;
+  orientation?: string;
   confidence?: string;
   visualEvidence?: string;
 }
@@ -210,6 +211,7 @@ Return only valid JSON with this exact shape:
     {
       "name": "The card name or Unknown card",
       "position": "Visible spread position, such as left, center, right, past, present, future",
+      "orientation": "upright or reversed",
       "confidence": "high, medium, low, or selected manually",
       "visualEvidence": "short reason based on the image"
     }
@@ -239,6 +241,7 @@ Return only valid JSON with this exact shape:
           .map((card: any) => ({
             name: card.name,
             position: typeof card.position === 'string' ? card.position : 'Unknown position',
+            orientation: typeof card.orientation === 'string' ? card.orientation.toLowerCase() : 'upright',
             confidence: typeof card.confidence === 'string' ? card.confidence : undefined,
             visualEvidence: typeof card.visualEvidence === 'string' ? card.visualEvidence : undefined,
           }))
@@ -303,16 +306,24 @@ export async function generateAdvancedReading(
   question: string,
   horoscope: string
 ) {
-  let detectedCards: string[] = [...manualCards];
+  let detectedCardObjects: Array<{ name: string; orientation: string }> =
+    manualCards.map((name) => ({ name, orientation: 'upright' }));
+
   if (image) {
     const analysis = await generateReadingAnalysis([], question, image);
-    detectedCards = analysis.detectedCards.map(c => c.name);
+    detectedCardObjects = analysis.detectedCards.map((c) => ({
+      name: c.name,
+      orientation: c.orientation || 'upright',
+    }));
   }
-  const cardsToUse = detectedCards.length > 0 ? detectedCards : manualCards;
-  
+
+  const cardNames = detectedCardObjects.length > 0
+    ? detectedCardObjects.map((c) => c.name)
+    : manualCards;
+
   if (!process.env.GEMINI_API_KEY) {
     return {
-      detectedCards: cardsToUse,
+      detectedCards: detectedCardObjects,
       tarotReading: "Placeholder Tarot Reading because Gemini API key is missing.",
       horoscopeReading: "Placeholder Horoscope Reading because Gemini API key is missing.",
       harmonizedReading: "Placeholder Harmonized Reading because Gemini API key is missing."
@@ -320,11 +331,15 @@ export async function generateAdvancedReading(
   }
 
   try {
-    const tarotPrompt = `You are a Tarot Vision AI. Based on the cards: ${cardsToUse.join(', ')} and the question: "${question}", provide a focused tarot reading.`;
+    const cardSummary = detectedCardObjects
+      .map((c) => `${c.name} (${c.orientation})`)
+      .join(', ');
+
+    const tarotPrompt = `You are a Tarot Vision AI. Based on the cards: ${cardSummary} and the question: "${question}", provide a focused tarot reading. Note the orientation (upright/reversed) of each card as it affects the reading.`;
     const tarotResult = await generateContentWithFallback(tarotPrompt);
     const tarotReading = tarotResult.result.response.text();
 
-    const horoscopePrompt = `You are a Horoscope AI. The user's horoscope is ${horoscope}. Based on their sign, the cards: ${cardsToUse.join(', ')} and the question: "${question}", provide a horoscope reading.`;
+    const horoscopePrompt = `You are a Horoscope AI. The user's horoscope is ${horoscope}. Based on their sign, the cards: ${cardNames.join(', ')} and the question: "${question}", provide a horoscope reading.`;
     const horoscopeResult = await generateContentWithFallback(horoscopePrompt);
     const horoscopeReading = horoscopeResult.result.response.text();
 
@@ -333,7 +348,7 @@ export async function generateAdvancedReading(
     const harmonizedReading = harmonizeResult.result.response.text();
 
     return {
-      detectedCards: cardsToUse,
+      detectedCards: detectedCardObjects,
       tarotReading,
       horoscopeReading,
       harmonizedReading

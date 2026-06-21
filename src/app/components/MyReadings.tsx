@@ -14,6 +14,7 @@ interface DetectedCard {
   id: number;
   name: string;
   position: string | null;
+  orientation: string | null;
 }
 
 interface AgentReading {
@@ -214,11 +215,17 @@ export function MyReadings() {
                 {selectedSubmission.reading?.detectedCards && selectedSubmission.reading.detectedCards.length > 0 && (
                   <div>
                     <h3 className="font-medium mb-3">Cards Detected:</h3>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="space-y-2">
                       {selectedSubmission.reading.detectedCards.map((card, idx) => (
-                        <Badge key={card.id} variant="secondary" className="text-sm">
-                          {idx + 1}. {card.name}
-                        </Badge>
+                        <div key={card.id} className="flex flex-wrap items-center gap-2">
+                          <Badge variant="secondary">{idx + 1}</Badge>
+                          <span className="text-sm font-medium">{card.name}</span>
+                          {card.orientation && (
+                            <Badge variant={card.orientation === 'upright' ? 'default' : 'outline'} className="text-xs">
+                              {card.orientation}
+                            </Badge>
+                          )}
+                        </div>
                       ))}
                     </div>
                   </div>

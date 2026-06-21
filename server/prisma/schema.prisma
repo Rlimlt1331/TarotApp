@@ -69,12 +69,13 @@ model Reading {
 }
 
 model Card {
-  id        Int      @id @default(autoincrement())
-  readingId Int
-  name      String
-  position  String?
-  createdAt DateTime @default(now())
-  reading   Reading  @relation(fields: [readingId], references: [id], onDelete: Cascade)
+  id          Int      @id @default(autoincrement())
+  readingId   Int
+  name        String
+  position    String?
+  orientation String?
+  createdAt   DateTime @default(now())
+  reading     Reading  @relation(fields: [readingId], references: [id], onDelete: Cascade)
 
   @@map("cards")
 }
