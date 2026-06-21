@@ -46,7 +46,7 @@ jobs:
       - name: Setup database
         env:
           DATABASE_URL: postgresql://tarot_user:tarot_password@localhost:5432/tarot_db?schema=public
-        run: cd server && npx prisma migrate deploy --skip-generate
+        run: cd server && npx prisma migrate deploy
 
       - name: Verify backend setup
         run: cd server && npm run prisma:generate
