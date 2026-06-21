@@ -17,7 +17,7 @@ model User {
   updatedAt   DateTime         @updatedAt
   role        UserRole         @default(requester)
   feedbacks   Feedback[]
-  readings    Reading[]
+  submissions Submission[]
   preferences UserPreferences?
 
   @@map("users")
@@ -35,16 +35,35 @@ model UserPreferences {
   @@map("user_preferences")
 }
 
+model Submission {
+  id              Int       @id @default(autoincrement())
+  userId          Int
+  question        String
+  category        String?
+  horoscope       String?
+  gender          String?
+  country         String?
+  occupation      String?
+  additionalNotes String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reading         Reading?
+  feedbacks       Feedback[]
+
+  @@map("submissions")
+}
+
 model Reading {
-  id             Int        @id @default(autoincrement())
-  userId         Int
-  interpretation String?
-  title          String?
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
-  cards          Card[]
-  feedbacks      Feedback[]
-  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                Int        @id @default(autoincrement())
+  submissionId      Int        @unique
+  astrologyReading  String?
+  tarotReading      String?
+  harmonisedReading String?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  submission        Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  detectedCards     Card[]
 
   @@map("readings")
 }
@@ -53,8 +72,7 @@ model Card {
   id        Int      @id @default(autoincrement())
   readingId Int
   name      String
-  position  String
-  meaning   String?
+  position  String?
   createdAt DateTime @default(now())
   reading   Reading  @relation(fields: [readingId], references: [id], onDelete: Cascade)
 
@@ -62,17 +80,17 @@ model Card {
 }
 
 model Feedback {
-  id        Int      @id @default(autoincrement())
-  readingId Int
-  userId    Int
-  rating    Int
-  comment   String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  reading   Reading  @relation(fields: [readingId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id           Int        @id @default(autoincrement())
+  submissionId Int
+  userId       Int
+  rating       Int
+  comment      String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([readingId, userId])
+  @@unique([submissionId, userId])
   @@map("feedbacks")
 }
 

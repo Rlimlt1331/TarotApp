@@ -10,30 +10,45 @@ import { apiClient } from '../../lib/api-client';
 import { ReadingFeedback } from './ReadingFeedback';
 import { toast } from 'sonner';
 
-interface BackendReading {
+interface DetectedCard {
   id: number;
-  title: string;
-  interpretation: string | null;
+  name: string;
+  position: string | null;
+}
+
+interface AgentReading {
+  id: number;
+  astrologyReading: string | null;
+  tarotReading: string | null;
+  harmonisedReading: string | null;
+  detectedCards: DetectedCard[];
+}
+
+interface Submission {
+  id: number;
+  question: string;
+  category: string | null;
+  horoscope: string | null;
+  gender: string | null;
+  country: string | null;
+  occupation: string | null;
+  additionalNotes: string | null;
   createdAt: string;
-  cards: Array<{
-    id: number;
-    name: string;
-    position: string;
-  }>;
+  reading: AgentReading | null;
 }
 
 export function MyReadings() {
   const { user } = useAuth();
-  const [readings, setReadings] = useState<BackendReading[]>([]);
+  const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedReading, setSelectedReading] = useState<BackendReading | null>(null);
+  const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
 
   useEffect(() => {
-    const fetchReadings = async () => {
+    const fetchSubmissions = async () => {
       if (!user) return;
       try {
-        const data = await apiClient.getReadings();
-        setReadings(data);
+        const data = await apiClient.getSubmissions();
+        setSubmissions(data);
       } catch (error: any) {
         toast.error(error.message || 'Failed to fetch readings');
       } finally {
@@ -41,7 +56,7 @@ export function MyReadings() {
       }
     };
 
-    fetchReadings();
+    fetchSubmissions();
   }, [user]);
 
   const categoryColors: Record<string, string> = {
@@ -51,8 +66,8 @@ export function MyReadings() {
     general: 'bg-purple-500/10 text-purple-700 border-purple-200',
   };
 
-  const completedCount = readings.filter(r => r.interpretation && r.interpretation.trim() !== '').length;
-  const pendingCount = readings.filter(r => !r.interpretation || r.interpretation.trim() === '').length;
+  const completedCount = submissions.filter(s => s.reading !== null).length;
+  const pendingCount = submissions.filter(s => s.reading === null).length;
 
   if (loading) {
     return (
@@ -81,7 +96,7 @@ export function MyReadings() {
               <CardTitle className="text-sm text-purple-900 dark:text-purple-100">Total Requests</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-4xl font-bold text-purple-600">{readings.length}</div>
+              <div className="text-4xl font-bold text-purple-600">{submissions.length}</div>
             </CardContent>
           </Card>
           <Card className="tarot-card bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900 border-green-200">
@@ -104,36 +119,35 @@ export function MyReadings() {
 
         <div className="space-y-4">
           <h2 className="text-2xl">Your Readings</h2>
-          {readings.length === 0 ? (
+          {submissions.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">
                 <p className="text-muted-foreground">No readings yet</p>
               </CardContent>
             </Card>
           ) : (
-            readings.map((reading) => {
-              const categoryCard = reading.cards.find(c => c.position === 'Category');
-              const category = categoryCard ? categoryCard.name : 'general';
-              const selectedCards = reading.cards.filter(c => !['Category', 'Horoscope', 'Country', 'Gender', 'Occupation', 'Additional Notes'].includes(c.position));
+            submissions.map((submission) => {
+              const category = submission.category || 'general';
+              const isCompleted = submission.reading !== null;
 
               return (
-                <Card key={reading.id} className="tarot-card">
+                <Card key={submission.id} className="tarot-card">
                   <CardHeader>
                     <div className="flex items-start justify-between">
                       <div className="space-y-1">
                         <CardTitle className="flex items-center gap-2">
                           <Sparkles className="size-5" />
-                          {reading.title || 'Tarot Reading'}
+                          {submission.question}
                         </CardTitle>
                         <CardDescription className="flex items-center gap-4 text-sm">
                           <span className="flex items-center gap-1">
                             <Calendar className="size-4" />
-                            {format(new Date(reading.createdAt), 'MMM dd, yyyy')}
+                            {format(new Date(submission.createdAt), 'MMM dd, yyyy')}
                           </span>
                           <Badge className={categoryColors[category] || categoryColors.general}>
                             {category}
                           </Badge>
-                          {!reading.interpretation && (
+                          {!isCompleted && (
                             <Badge className="bg-amber-500/10 text-amber-700 border-amber-200">
                               Pending
                             </Badge>
@@ -143,11 +157,11 @@ export function MyReadings() {
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {selectedCards.length > 0 && (
+                    {isCompleted && submission.reading!.detectedCards.length > 0 && (
                       <div>
-                        <p className="text-sm font-medium mb-2">Cards Drawn:</p>
+                        <p className="text-sm font-medium mb-2">Cards Detected:</p>
                         <div className="flex flex-wrap gap-2">
-                          {selectedCards.map((card) => (
+                          {submission.reading!.detectedCards.map((card) => (
                             <Badge key={card.id} variant="outline">
                               {card.name}
                             </Badge>
@@ -159,13 +173,13 @@ export function MyReadings() {
                     <div>
                       <p className="text-sm font-medium mb-2">Reading Summary:</p>
                       <p className="text-sm text-muted-foreground line-clamp-3">
-                        {reading.interpretation || 'Your reading is being prepared by the reader. Check back soon.'}
+                        {submission.reading?.harmonisedReading || 'Your reading is being prepared by the reader. Check back soon.'}
                       </p>
                     </div>
 
                     <Button
                       variant="outline"
-                      onClick={() => setSelectedReading(reading)}
+                      onClick={() => setSelectedSubmission(submission)}
                       className="w-full"
                     >
                       View Full Reading
@@ -178,9 +192,9 @@ export function MyReadings() {
         </div>
       </div>
 
-      <Dialog open={!!selectedReading} onOpenChange={() => setSelectedReading(null)}>
+      <Dialog open={!!selectedSubmission} onOpenChange={() => setSelectedSubmission(null)}>
         <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
-          {selectedReading && (
+          {selectedSubmission && (
             <>
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
@@ -188,34 +202,60 @@ export function MyReadings() {
                   Your Tarot Reading
                 </DialogTitle>
                 <DialogDescription>
-                  Generated on {format(new Date(selectedReading.createdAt), 'MMMM dd, yyyy')}
+                  Submitted on {format(new Date(selectedSubmission.createdAt), 'MMMM dd, yyyy')}
                 </DialogDescription>
               </DialogHeader>
 
               <div className="space-y-6">
-                {selectedReading.cards.filter(c => !['Category', 'Horoscope', 'Country', 'Gender', 'Occupation', 'Additional Notes'].includes(c.position)).length > 0 && (
+                {selectedSubmission.reading?.detectedCards && selectedSubmission.reading.detectedCards.length > 0 && (
                   <div>
-                    <h3 className="font-medium mb-3">Cards Drawn:</h3>
+                    <h3 className="font-medium mb-3">Cards Detected:</h3>
                     <div className="flex flex-wrap gap-2">
-                      {selectedReading.cards
-                        .filter(c => !['Category', 'Horoscope', 'Country', 'Gender', 'Occupation', 'Additional Notes'].includes(c.position))
-                        .map((card, idx) => (
-                          <Badge key={card.id} variant="secondary" className="text-sm">
-                            {idx + 1}. {card.name}
-                          </Badge>
-                        ))}
+                      {selectedSubmission.reading.detectedCards.map((card, idx) => (
+                        <Badge key={card.id} variant="secondary" className="text-sm">
+                          {idx + 1}. {card.name}
+                        </Badge>
+                      ))}
                     </div>
                   </div>
                 )}
 
-                <div>
-                  <h3 className="font-medium mb-3">Your Reading:</h3>
-                  <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                    {selectedReading.interpretation}
-                  </p>
-                </div>
+                {selectedSubmission.reading?.tarotReading && (
+                  <div>
+                    <h3 className="font-medium mb-3">Tarot Reading:</h3>
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                      {selectedSubmission.reading.tarotReading}
+                    </p>
+                  </div>
+                )}
 
-                <ReadingFeedback readingId={selectedReading.id} />
+                {selectedSubmission.reading?.astrologyReading && (
+                  <div>
+                    <h3 className="font-medium mb-3">Astrology Reading:</h3>
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                      {selectedSubmission.reading.astrologyReading}
+                    </p>
+                  </div>
+                )}
+
+                {selectedSubmission.reading?.harmonisedReading && (
+                  <div>
+                    <h3 className="font-medium mb-3">Harmonised Reading:</h3>
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                      {selectedSubmission.reading.harmonisedReading}
+                    </p>
+                  </div>
+                )}
+
+                {!selectedSubmission.reading && (
+                  <p className="text-sm text-muted-foreground">
+                    Your reading is being prepared by the reader. Check back soon.
+                  </p>
+                )}
+
+                {selectedSubmission.reading && (
+                  <ReadingFeedback submissionId={selectedSubmission.id} />
+                )}
               </div>
             </>
           )}

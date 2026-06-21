@@ -108,6 +108,27 @@ class ApiClient {
     return this.request('DELETE', `/readings/${id}`);
   }
 
+  // Submissions endpoints (new schema)
+  async createSubmission(data: {
+    question: string;
+    category?: string;
+    horoscope?: string;
+    gender?: string;
+    country?: string;
+    occupation?: string;
+    additionalNotes?: string;
+  }) {
+    return this.request('POST', '/submissions', data);
+  }
+
+  async getSubmissions() {
+    return this.request('GET', '/submissions');
+  }
+
+  async getSubmission(id: number) {
+    return this.request('GET', `/submissions/${id}`);
+  }
+
   // Users endpoints
   async getProfile() {
     return this.request('GET', '/users/profile');

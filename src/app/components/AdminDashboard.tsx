@@ -14,10 +14,32 @@ import { toast } from 'sonner';
 
 type QueueStatus = 'pending' | 'processing' | 'completed';
 
-interface Reading {
+interface DetectedCardRecord {
   id: number;
-  title: string;
-  interpretation: string | null;
+  name: string;
+  position: string | null;
+}
+
+interface AgentReading {
+  id: number;
+  submissionId: number;
+  astrologyReading: string | null;
+  tarotReading: string | null;
+  harmonisedReading: string | null;
+  detectedCards: DetectedCardRecord[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface Submission {
+  id: number;
+  question: string;
+  category: string | null;
+  horoscope: string | null;
+  gender: string | null;
+  country: string | null;
+  occupation: string | null;
+  additionalNotes: string | null;
   createdAt: string;
   updatedAt: string;
   user: {
@@ -25,12 +47,7 @@ interface Reading {
     email: string;
     name: string;
   };
-  cards: Array<{
-    id: number;
-    name: string;
-    position: string;
-    meaning?: string;
-  }>;
+  reading: AgentReading | null;
   feedbacks: Array<{
     id: number;
     rating: number;
@@ -69,9 +86,9 @@ const statusStyles: Record<QueueStatus, string> = {
 };
 
 export const AdminDashboard: React.FC = () => {
-  const [readings, setReadings] = useState<Reading[]>([]);
+  const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedReading, setSelectedReading] = useState<Reading | null>(null);
+  const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
   const [statuses, setStatuses] = useState<Record<number, QueueStatus>>(() => {
     const stored = localStorage.getItem('tarot_admin_statuses');
     return stored ? JSON.parse(stored) : {};
@@ -82,6 +99,8 @@ export const AdminDashboard: React.FC = () => {
   const [pipelineRunning, setPipelineRunning] = useState(false);
   const [pipelineProgress, setPipelineProgress] = useState(0);
   const [harmonisedReading, setHarmonisedReading] = useState('');
+  const [astrologyReading, setAstrologyReading] = useState('');
+  const [tarotReading, setTarotReading] = useState('');
   const [detectedCards, setDetectedCards] = useState<DetectedCard[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const { token } = useAuth();
@@ -94,10 +113,10 @@ export const AdminDashboard: React.FC = () => {
     localStorage.setItem('tarot_admin_statuses', JSON.stringify(statuses));
   }, [statuses]);
 
-  const getStatus = (readingId: number): QueueStatus => {
-    if (statuses[readingId] === 'processing') return 'processing';
-    const reading = readings.find(r => r.id === readingId);
-    if (reading?.interpretation) return 'completed';
+  const getStatus = (submissionId: number): QueueStatus => {
+    if (statuses[submissionId] === 'processing') return 'processing';
+    const submission = submissions.find(s => s.id === submissionId);
+    if (submission?.reading) return 'completed';
     return 'pending';
   };
 
@@ -105,7 +124,7 @@ export const AdminDashboard: React.FC = () => {
     if (!token) return;
 
     try {
-      const response = await fetch(`${API_URL}/readings/admin/submissions`, {
+      const response = await fetch(`${API_URL}/submissions/admin/all`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -114,7 +133,7 @@ export const AdminDashboard: React.FC = () => {
       }
 
       const data = await response.json();
-      setReadings(data);
+      setSubmissions(data);
     } catch (error: any) {
       toast.error(error.message || 'Failed to load submissions');
     } finally {
@@ -123,35 +142,45 @@ export const AdminDashboard: React.FC = () => {
   };
 
   const queueCounts = useMemo(() => {
-    return readings.reduce(
-      (counts, reading) => {
-        counts[getStatus(reading.id)] += 1;
+    return submissions.reduce(
+      (counts, submission) => {
+        counts[getStatus(submission.id)] += 1;
         return counts;
       },
       { pending: 0, processing: 0, completed: 0 } as Record<QueueStatus, number>
     );
-  }, [readings, statuses]);
+  }, [submissions, statuses]);
 
-  const selectReading = (reading: Reading) => {
-    setSelectedReading(reading);
+  const selectSubmission = (submission: Submission) => {
+    setSelectedSubmission(submission);
     setSpreadImage('');
     setSelectedCards([]);
     setAgentResults([]);
     setPipelineProgress(0);
-    setHarmonisedReading(reading.interpretation ?? '');
-    setDetectedCards([]);
+    setHarmonisedReading(submission.reading?.harmonisedReading || '');
+    setAstrologyReading(submission.reading?.astrologyReading || '');
+    setTarotReading(submission.reading?.tarotReading || '');
+    if (submission.reading?.detectedCards) {
+      setDetectedCards(submission.reading.detectedCards.map(c => ({
+        name: c.name,
+        position: c.position || '',
+        confidence: 'Saved',
+      })));
+    } else {
+      setDetectedCards([]);
+    }
   };
 
-  const updateStatus = (readingId: number, status: QueueStatus) => {
-    setStatuses((current) => ({ ...current, [readingId]: status }));
+  const updateStatus = (submissionId: number, status: QueueStatus) => {
+    setStatuses((current) => ({ ...current, [submissionId]: status }));
   };
 
   const submitReading = async () => {
-    if (!selectedReading || !harmonisedReading.trim()) return;
+    if (!selectedSubmission || !harmonisedReading.trim()) return;
     setSubmitting(true);
     try {
       const response = await fetch(
-        `${API_URL}/readings/admin/submissions/${selectedReading.id}`,
+        `${API_URL}/submissions/admin/${selectedSubmission.id}`,
         {
           method: 'PUT',
           headers: {
@@ -159,7 +188,9 @@ export const AdminDashboard: React.FC = () => {
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
-            interpretation: harmonisedReading,
+            astrologyReading,
+            tarotReading,
+            harmonisedReading,
             detectedCardNames: detectedCards.map((c) => c.name),
           }),
         }
@@ -173,12 +204,12 @@ export const AdminDashboard: React.FC = () => {
         throw new Error(message || 'Failed to submit reading');
       }
 
-      const updatedReading = await response.json();
-      setSelectedReading(updatedReading);
-      setReadings((current) =>
-        current.map((r) => (r.id === updatedReading.id ? updatedReading : r))
+      const updatedSubmission = await response.json();
+      setSelectedSubmission(updatedSubmission);
+      setSubmissions((current) =>
+        current.map((s) => (s.id === updatedSubmission.id ? updatedSubmission : s))
       );
-      updateStatus(selectedReading.id, 'completed');
+      updateStatus(selectedSubmission.id, 'completed');
       toast.success('Reading submitted to requester');
     } catch (error: any) {
       toast.error(error.message || 'Failed to submit reading');
@@ -187,9 +218,17 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
-  const getContextValue = (position: string) => {
-    const card = selectedReading?.cards.find((item) => item.position.toLowerCase() === position.toLowerCase());
-    return card?.name || card?.meaning || 'Not provided';
+  const getContextValue = (field: string) => {
+    if (!selectedSubmission) return 'Not provided';
+    switch (field.toLowerCase()) {
+      case 'horoscope': return selectedSubmission.horoscope || 'Not provided';
+      case 'category': return selectedSubmission.category || 'Not provided';
+      case 'country': return selectedSubmission.country || 'Not provided';
+      case 'gender': return selectedSubmission.gender || 'Not provided';
+      case 'occupation': return selectedSubmission.occupation || 'Not provided';
+      case 'additional notes': return selectedSubmission.additionalNotes || 'Not provided';
+      default: return 'Not provided';
+    }
   };
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -219,7 +258,7 @@ export const AdminDashboard: React.FC = () => {
   };
 
   const runPipeline = async (image?: string) => {
-    if (!selectedReading) return;
+    if (!selectedSubmission) return;
 
     const cardsForReading = selectedCards.map((card, index) => ({
       name: card,
@@ -231,15 +270,15 @@ export const AdminDashboard: React.FC = () => {
       return;
     }
 
-    const horoscope = selectedReading.cards.find((c) => c.position === 'Horoscope')?.name || 'unknown';
-    const category = selectedReading.cards.find((c) => c.position === 'Category')?.name || 'general';
+    const horoscope = selectedSubmission.horoscope || 'unknown';
+    const category = selectedSubmission.category || 'general';
 
     setPipelineRunning(true);
     setPipelineProgress(15);
     setAgentResults([]);
     setHarmonisedReading('');
     setDetectedCards([]);
-    updateStatus(selectedReading.id, 'processing');
+    updateStatus(selectedSubmission.id, 'processing');
 
     try {
       // Phase 1: simulate agent progress for visual feedback while real API call prepares
@@ -269,7 +308,7 @@ export const AdminDashboard: React.FC = () => {
 
       // Phase 2: real AI generation on the backend
       const response = await fetch(
-        `${API_URL}/readings/admin/submissions/${selectedReading.id}/generate`,
+        `${API_URL}/submissions/admin/${selectedSubmission.id}/generate`,
         {
           method: 'POST',
           headers: {
@@ -333,12 +372,14 @@ export const AdminDashboard: React.FC = () => {
         }))
       );
 
+      setAstrologyReading(generated.horoscopeReading || '');
+      setTarotReading(generated.tarotReading || '');
       setHarmonisedReading(generated.harmonizedReading || generated.harmonisedReading || '');
       setPipelineProgress(100);
       toast.success('Reading generated — review and click "Submit Reading" to send to requester');
     } catch (error: any) {
       toast.error(error.message || 'Failed to run AI pipeline');
-      updateStatus(selectedReading.id, 'pending');
+      updateStatus(selectedSubmission.id, 'pending');
     } finally {
       setPipelineRunning(false);
     }
@@ -352,12 +393,12 @@ export const AdminDashboard: React.FC = () => {
     );
   }
 
-  if (selectedReading) {
-    const status = getStatus(selectedReading.id);
+  if (selectedSubmission) {
+    const status = getStatus(selectedSubmission.id);
 
     return (
       <div className="container mx-auto px-4 py-8">
-        <Button variant="ghost" onClick={() => setSelectedReading(null)} className="mb-4">
+        <Button variant="ghost" onClick={() => setSelectedSubmission(null)} className="mb-4">
           <ArrowLeft className="size-4 mr-2" />
           Back to Queue
         </Button>
@@ -368,8 +409,8 @@ export const AdminDashboard: React.FC = () => {
               <CardHeader>
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <CardTitle>{selectedReading.user.name}</CardTitle>
-                    <CardDescription>{selectedReading.user.email}</CardDescription>
+                    <CardTitle>{selectedSubmission.user.name}</CardTitle>
+                    <CardDescription>{selectedSubmission.user.email}</CardDescription>
                   </div>
                   <Badge className={statusStyles[status]}>{status}</Badge>
                 </div>
@@ -377,7 +418,7 @@ export const AdminDashboard: React.FC = () => {
               <CardContent className="space-y-4 text-sm">
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Calendar className="size-4" />
-                  {format(new Date(selectedReading.createdAt), 'MMM dd, yyyy HH:mm')}
+                  {format(new Date(selectedSubmission.createdAt), 'MMM dd, yyyy HH:mm')}
                 </div>
                 <div className="flex items-center gap-2">
                   <Star className="size-4 text-muted-foreground" />
@@ -389,16 +430,17 @@ export const AdminDashboard: React.FC = () => {
                 </div>
                 <div>
                   <p className="font-medium mb-1">Question</p>
-                  <p className="text-muted-foreground">{selectedReading.title}</p>
+                  <p className="text-muted-foreground">{selectedSubmission.question}</p>
                 </div>
                 <div>
                   <p className="font-medium mb-2">Profile Context</p>
                   <div className="flex flex-wrap gap-2">
-                    {selectedReading.cards.map((card) => (
-                      <Badge key={card.id} variant="outline">
-                        {card.position}: {card.name}
-                      </Badge>
-                    ))}
+                    <Badge variant="outline">Category: {getContextValue('Category')}</Badge>
+                    <Badge variant="outline">Horoscope: {getContextValue('Horoscope')}</Badge>
+                    <Badge variant="outline">Country: {getContextValue('Country')}</Badge>
+                    <Badge variant="outline">Gender: {getContextValue('Gender')}</Badge>
+                    <Badge variant="outline">Occupation: {getContextValue('Occupation')}</Badge>
+                    <Badge variant="outline">Notes: {getContextValue('Additional Notes')}</Badge>
                   </div>
                 </div>
               </CardContent>
@@ -469,28 +511,23 @@ export const AdminDashboard: React.FC = () => {
           </div>
 
           <div className="space-y-4">
-            {(() => {
-              const savedDetectedCards = selectedReading.cards.filter((c) =>
-                c.position.startsWith('Detected Card')
-              );
-              return savedDetectedCards.length > 0 ? (
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center gap-2 text-base">
-                      <Star className="size-4" />
-                      Cards from Reading Session
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex flex-wrap gap-2">
-                      {savedDetectedCards.map((card, i) => (
-                        <Badge key={i} variant="outline">{card.name}</Badge>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              ) : null;
-            })()}
+            {selectedSubmission.reading?.detectedCards && selectedSubmission.reading.detectedCards.length > 0 && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Star className="size-4" />
+                    Cards from Reading Session
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedSubmission.reading.detectedCards.map((card, i) => (
+                      <Badge key={i} variant="outline">{card.name}</Badge>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -589,7 +626,7 @@ export const AdminDashboard: React.FC = () => {
                     Harmonised Reading
                   </CardTitle>
                   <CardDescription>
-                    {getStatus(selectedReading.id) === 'completed'
+                    {getStatus(selectedSubmission.id) === 'completed'
                       ? 'Submitted to the requester.'
                       : 'Review and edit the reading before submitting to the requester.'}
                   </CardDescription>
@@ -599,9 +636,9 @@ export const AdminDashboard: React.FC = () => {
                     value={harmonisedReading}
                     onChange={(e) => setHarmonisedReading(e.target.value)}
                     className="min-h-[220px] text-sm leading-relaxed"
-                    disabled={getStatus(selectedReading.id) === 'completed' || submitting}
+                    disabled={getStatus(selectedSubmission.id) === 'completed' || submitting}
                   />
-                  {getStatus(selectedReading.id) !== 'completed' && (
+                  {getStatus(selectedSubmission.id) !== 'completed' && (
                     <Button
                       onClick={submitReading}
                       disabled={submitting || !harmonisedReading.trim()}
@@ -611,7 +648,7 @@ export const AdminDashboard: React.FC = () => {
                       {submitting ? 'Submitting…' : 'Submit Reading to Requester'}
                     </Button>
                   )}
-                  {getStatus(selectedReading.id) === 'completed' && (
+                  {getStatus(selectedSubmission.id) === 'completed' && (
                     <div className="flex items-center gap-2 text-sm text-green-600">
                       <CheckCircle2 className="size-4" />
                       Reading submitted — visible to requester under My Readings.
@@ -646,7 +683,7 @@ export const AdminDashboard: React.FC = () => {
         ))}
       </div>
 
-      {readings.length === 0 ? (
+      {submissions.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
             <p className="text-gray-500">No submissions yet</p>
@@ -654,25 +691,25 @@ export const AdminDashboard: React.FC = () => {
         </Card>
       ) : (
         <div className="grid gap-4">
-          {readings.map((reading) => {
-            const status = getStatus(reading.id);
+          {submissions.map((submission) => {
+            const status = getStatus(submission.id);
 
             return (
               <Card
-                key={reading.id}
+                key={submission.id}
                 className="cursor-pointer hover:shadow-lg transition-shadow"
-                onClick={() => selectReading(reading)}
+                onClick={() => selectSubmission(submission)}
               >
                 <CardHeader>
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <CardTitle className="flex items-center gap-2">
                         <User className="size-5" />
-                        {reading.title}
+                        {submission.question}
                       </CardTitle>
                       <CardDescription className="flex flex-wrap items-center gap-4 mt-2">
-                        <span>{reading.user.name}</span>
-                        <span>{format(new Date(reading.createdAt), 'MMM dd, yyyy HH:mm')}</span>
+                        <span>{submission.user.name}</span>
+                        <span>{format(new Date(submission.createdAt), 'MMM dd, yyyy HH:mm')}</span>
                       </CardDescription>
                     </div>
                     <Badge className={statusStyles[status]}>{status}</Badge>
@@ -680,11 +717,18 @@ export const AdminDashboard: React.FC = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="flex flex-wrap gap-2">
-                    {reading.cards.slice(0, 5).map((card) => (
-                      <Badge key={card.id} variant="outline">
-                        {card.position}: {card.name}
-                      </Badge>
-                    ))}
+                    {submission.category && (
+                      <Badge variant="outline">Category: {submission.category}</Badge>
+                    )}
+                    {submission.horoscope && (
+                      <Badge variant="outline">Horoscope: {submission.horoscope}</Badge>
+                    )}
+                    {submission.country && (
+                      <Badge variant="outline">Country: {submission.country}</Badge>
+                    )}
+                    {submission.gender && (
+                      <Badge variant="outline">Gender: {submission.gender}</Badge>
+                    )}
                     {status === 'completed' && (
                       <Badge variant="secondary" className="gap-1">
                         <CheckCircle2 className="size-3" />

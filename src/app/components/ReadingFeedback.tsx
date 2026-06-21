@@ -15,10 +15,10 @@ interface Feedback {
 }
 
 interface ReadingFeedbackProps {
-  readingId: number;
+  submissionId: number;
 }
 
-export const ReadingFeedback: React.FC<ReadingFeedbackProps> = ({ readingId }) => {
+export const ReadingFeedback: React.FC<ReadingFeedbackProps> = ({ submissionId }) => {
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [rating, setRating] = useState(0);
   const [hoveredRating, setHoveredRating] = useState(0);
@@ -31,12 +31,12 @@ export const ReadingFeedback: React.FC<ReadingFeedbackProps> = ({ readingId }) =
     if (token) {
       fetchFeedback();
     }
-  }, [readingId, token]);
+  }, [submissionId, token]);
 
   const fetchFeedback = async () => {
     try {
       const response = await fetch(
-        `${API_URL}/readings/${readingId}/feedback`,
+        `${API_URL}/submissions/${submissionId}/feedback`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -66,7 +66,7 @@ export const ReadingFeedback: React.FC<ReadingFeedbackProps> = ({ readingId }) =
     setLoading(true);
     try {
       const response = await fetch(
-        `${API_URL}/readings/${readingId}/feedback`,
+        `${API_URL}/submissions/${submissionId}/feedback`,
         {
           method: 'POST',
           headers: {
@@ -97,7 +97,7 @@ export const ReadingFeedback: React.FC<ReadingFeedbackProps> = ({ readingId }) =
     setLoading(true);
     try {
       const response = await fetch(
-        `${API_URL}/readings/${readingId}/feedback`,
+        `${API_URL}/submissions/${submissionId}/feedback`,
         {
           method: 'DELETE',
           headers: { Authorization: `Bearer ${token}` },

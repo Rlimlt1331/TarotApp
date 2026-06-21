@@ -105,25 +105,20 @@ export function RequesterPortal({ onShowAuthModal }: { onShowAuthModal: () => vo
     setSubmitting(true);
 
     try {
-      const cards = [
-        { name: selectedCategory, position: 'Category', meaning: question },
-        { name: horoscope, position: 'Horoscope' },
-        { name: country, position: 'Country' },
-        { name: gender, position: 'Gender' },
-        ...(occupation ? [{ name: occupation, position: 'Occupation' }] : []),
-        ...(additionalNotes ? [{ name: additionalNotes, position: 'Additional Notes' }] : []),
-      ];
-
-      const response = await fetch(`${API_URL}/readings`, {
+      const response = await fetch(`${API_URL}/submissions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          title: question,
-          cards,
-          skipGeneration: true,
+          question,
+          category: selectedCategory,
+          horoscope,
+          gender,
+          country,
+          occupation: occupation || undefined,
+          additionalNotes: additionalNotes || undefined,
         }),
       });
 

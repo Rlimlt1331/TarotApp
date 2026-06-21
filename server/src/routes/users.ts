@@ -102,15 +102,15 @@ router.put('/preferences', verifyToken, async (req: AuthRequest, res: Response) 
 // Get user reading statistics
 router.get('/stats', verifyToken, async (req: AuthRequest, res: Response) => {
   try {
-    const totalReadings = await prisma.reading.count({
+    const totalReadings = await prisma.submission.count({
       where: { userId: req.userId! },
     });
 
-    const recentReadings = await prisma.reading.findMany({
+    const recentReadings = await prisma.submission.findMany({
       where: { userId: req.userId! },
       take: 5,
       orderBy: { createdAt: 'desc' },
-      select: { id: true, title: true, createdAt: true },
+      select: { id: true, question: true, createdAt: true },
     });
 
     res.json({
