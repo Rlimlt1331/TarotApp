@@ -154,7 +154,7 @@ router.post('/admin/submissions/:id/generate', verifyAdmin, async (req: AuthRequ
       return res.status(404).json({ error: 'Reading not found' });
     }
 
-    const horoscope = reading.cards.find((c) => c.position === 'Horoscope')?.name || '';
+    const horoscope = reading.cards.find((c: { position: string; name: string }) => c.position === 'Horoscope')?.name || '';
     const question = reading.title || '';
     const manualCards = Array.isArray(cards) && cards.length > 0
       ? cards.map((c: any) => (typeof c === 'string' ? c : c.name))
