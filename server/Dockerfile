@@ -1,4 +1,4 @@
-# Build stage — full install, compile, generate Prisma client, then prune devDeps
+# Build stage — full install, generate Prisma client, compile, then prune devDeps
 FROM node:20-alpine AS builder
 
 WORKDIR /app
@@ -8,20 +8,16 @@ RUN apk add --no-cache openssl
 
 COPY package*.json ./
 
-# Copy Prisma schema before npm ci so the postinstall prisma generate
-# runs with the correct schema and produces accurate TypeScript types
-COPY prisma ./prisma
-
 # Install all deps (including devDeps needed for tsc + prisma CLI)
 RUN npm ci
 
 COPY . .
 
+# Generate Prisma client BEFORE compiling TypeScript so correct types exist for tsc
+RUN npm run prisma:generate
+
 # Compile TypeScript
 RUN npm run build
-
-# Generate Prisma client (needs prisma CLI from devDeps + OpenSSL)
-RUN npm run prisma:generate
 
 # Drop devDeps so the copied node_modules is production-only
 RUN npm prune --omit=dev
