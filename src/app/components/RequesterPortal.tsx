@@ -161,10 +161,10 @@ export function RequesterPortal({ onShowAuthModal }: { onShowAuthModal: () => vo
   };
 
   return (
-    <div className="min-h-screen p-6 mystical-gradient-subtle">
-      <div className="max-w-4xl mx-auto space-y-8">
-        <div className="text-center space-y-4 py-8">
-          <h1 className="text-5xl flex items-center justify-center gap-3 gradient-text">
+    <div className="min-h-screen p-4 md:p-6 mystical-gradient-subtle">
+      <div className="max-w-4xl mx-auto space-y-4 md:space-y-6">
+        <div className="text-center space-y-4 py-4 md:py-8">
+          <h1 className="text-3xl md:text-5xl flex items-center justify-center gap-3 gradient-text">
             <Sparkles className="size-10 sparkle text-purple-600" />
             Request a Tarot Reading
           </h1>
@@ -179,7 +179,7 @@ export function RequesterPortal({ onShowAuthModal }: { onShowAuthModal: () => vo
           )}
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-4 md:space-y-6">
           <Card className="tarot-card">
             <CardHeader>
               <CardTitle>Your Horoscope Sign</CardTitle>
@@ -212,7 +212,7 @@ export function RequesterPortal({ onShowAuthModal }: { onShowAuthModal: () => vo
             </CardHeader>
             <CardContent>
               <RadioGroup value={gender} onValueChange={(value) => setGender(value as Gender)}>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="grid grid-cols-3 gap-2 md:gap-3">
                   {(['male', 'female', 'prefer-not-to-say'] as Gender[]).map((g) => (
                     <Label
                       key={g}
@@ -224,7 +224,7 @@ export function RequesterPortal({ onShowAuthModal }: { onShowAuthModal: () => vo
                       }`}
                     >
                       <RadioGroupItem value={g} id={`gender-${g}`} />
-                      <span className="capitalize text-sm">
+                      <span className="capitalize text-xs md:text-sm">
                         {g === 'prefer-not-to-say' ? 'Prefer not to say' : g}
                       </span>
                     </Label>
@@ -267,7 +267,7 @@ export function RequesterPortal({ onShowAuthModal }: { onShowAuthModal: () => vo
                   setSelectedCategory(value as ReadingCategory);
                   setSelectedQuestion('');
                 }}
-                className="grid grid-cols-1 md:grid-cols-3 gap-4"
+                className="grid grid-cols-3 gap-2 md:gap-4"
               >
                 {(['relationships', 'career', 'health'] as ReadingCategory[]).map((category) => {
                   const Icon = categoryIcons[category];
@@ -281,7 +281,7 @@ export function RequesterPortal({ onShowAuthModal }: { onShowAuthModal: () => vo
                     <Label
                       key={category}
                       htmlFor={category}
-                      className={`flex flex-col items-center gap-3 p-6 border-2 rounded-xl cursor-pointer transition-all ${
+                      className={`flex flex-col items-center gap-2 p-3 md:p-6 border-2 rounded-xl cursor-pointer transition-all ${
                         selectedCategory === category
                           ? 'border-primary bg-primary/10 shadow-lg mystical-glow'
                           : 'border-border hover:border-primary/50 hover:shadow-md'
@@ -314,7 +314,7 @@ export function RequesterPortal({ onShowAuthModal }: { onShowAuthModal: () => vo
                       key={idx}
                       type="button"
                       variant={selectedQuestion === q.question ? 'default' : 'outline'}
-                      className="justify-start h-auto py-3 px-4 text-left"
+                      className="justify-start h-auto py-2 px-3 md:py-3 md:px-4 text-left whitespace-normal"
                       onClick={() => {
                         setSelectedQuestion(q.question);
                         setCustomQuestion('');

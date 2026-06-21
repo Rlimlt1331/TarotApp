@@ -154,11 +154,17 @@ router.post('/admin/submissions/:id/generate', verifyAdmin, async (req: AuthRequ
       return res.status(404).json({ error: 'Reading not found' });
     }
 
-    const selectedCards = Array.isArray(cards) && cards.length > 0 ? cards : reading.cards;
-    const generated = await generateReadingAnalysis(
-      selectedCards,
-      reading.title || undefined,
-      spreadImage || image
+    const horoscope = reading.cards.find((c) => c.position === 'Horoscope')?.name || '';
+    const question = reading.title || '';
+    const manualCards = Array.isArray(cards) && cards.length > 0
+      ? cards.map((c: any) => (typeof c === 'string' ? c : c.name))
+      : [];
+
+    const generated = await generateAdvancedReading(
+      spreadImage || image,
+      manualCards,
+      question,
+      horoscope
     );
 
     res.json(generated);
@@ -175,7 +181,7 @@ router.post('/admin/submissions/:id/generate', verifyAdmin, async (req: AuthRequ
 router.put('/admin/submissions/:id', verifyAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const { interpretation, title, spreadImage, image, cards } = req.body;
+    const { interpretation, title, spreadImage, image, cards, detectedCardNames } = req.body;
 
     const reading = await prisma.reading.findUnique({
       where: { id: parseInt(id) },
@@ -211,7 +217,29 @@ router.put('/admin/submissions/:id', verifyAdmin, async (req: AuthRequest, res: 
       },
     });
 
-    res.json({ ...updatedReading, detectedCards: generated.detectedCards });
+    let finalReading: typeof updatedReading | null = updatedReading;
+    if (Array.isArray(detectedCardNames) && detectedCardNames.length > 0) {
+      await prisma.card.deleteMany({
+        where: { readingId: parseInt(id), position: { startsWith: 'Detected Card' } },
+      });
+      await prisma.card.createMany({
+        data: detectedCardNames.map((name: string, index: number) => ({
+          readingId: parseInt(id),
+          name,
+          position: `Detected Card ${index + 1}`,
+        })),
+      });
+      finalReading = await prisma.reading.findUnique({
+        where: { id: parseInt(id) },
+        include: {
+          cards: true,
+          user: { select: { id: true, email: true, name: true } },
+          feedbacks: true,
+        },
+      });
+    }
+
+    res.json({ ...finalReading, detectedCards: generated.detectedCards });
   } catch (error: any) {
     console.error('Update admin submission error:', error);
     if (error instanceof GeminiGenerationError) {

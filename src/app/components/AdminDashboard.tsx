@@ -44,6 +44,8 @@ interface AgentResult {
   name: string;
   summary: string;
   confidence: number;
+  fullOutput?: string;
+  detectedCardNames?: string[];
 }
 
 interface DetectedCard {
@@ -156,7 +158,10 @@ export const AdminDashboard: React.FC = () => {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ interpretation: harmonisedReading }),
+          body: JSON.stringify({
+            interpretation: harmonisedReading,
+            detectedCardNames: detectedCards.map((c) => c.name),
+          }),
         }
       );
 
@@ -213,30 +218,6 @@ export const AdminDashboard: React.FC = () => {
     });
   };
 
-  const buildAgentResult = async (agentName: string, reading: Reading): Promise<AgentResult> => {
-    await new Promise((resolve) => setTimeout(resolve, 900 + Math.random() * 700));
-
-    const question = reading.title;
-    const profileCards = reading.cards;
-    const category = profileCards.find((card) => card.position === 'Category')?.name || 'general';
-    const horoscope = profileCards.find((card) => card.position === 'Horoscope')?.name || 'unknown horoscope';
-    const country = profileCards.find((card) => card.position === 'Country')?.name || 'unknown location';
-    const gender = profileCards.find((card) => card.position === 'Gender')?.name || 'not specified';
-
-    const summaries: Record<string, string> = {
-      'Vision Agent': `Detected a clear spread image and mapped the visible cards into a working layout. The visual read emphasises the opening position, a central tension, and an outcome line for "${question}".`,
-      'Astrology Agent': `Cross-referenced ${horoscope} energy with the requester's profile from ${country}. The reading should speak to timing, emotional tone, and personal context without overgeneralising from ${gender}.`,
-      'Tarot Interpretation Agent': `Interpreted the spread through the ${category} lens, assigning meaning to each card position and relating the cards back to the requester's question.`,
-      'Harmoniser Agent': `Merged vision, astrology, and tarot outputs into one coherent reading with a direct answer, nuance, and practical guidance for the requester.`,
-    };
-
-    return {
-      name: agentName,
-      summary: summaries[agentName],
-      confidence: 0.82 + Math.random() * 0.14,
-    };
-  };
-
   const runPipeline = async (image?: string) => {
     if (!selectedReading) return;
 
@@ -250,6 +231,9 @@ export const AdminDashboard: React.FC = () => {
       return;
     }
 
+    const horoscope = selectedReading.cards.find((c) => c.position === 'Horoscope')?.name || 'unknown';
+    const category = selectedReading.cards.find((c) => c.position === 'Category')?.name || 'general';
+
     setPipelineRunning(true);
     setPipelineProgress(15);
     setAgentResults([]);
@@ -258,17 +242,32 @@ export const AdminDashboard: React.FC = () => {
     updateStatus(selectedReading.id, 'processing');
 
     try {
+      // Phase 1: simulate agent progress for visual feedback while real API call prepares
+      const tempSummaries: Record<string, string> = {
+        'Vision Agent': 'Analysing card spread image…',
+        'Astrology Agent': `Processing ${horoscope} energy…`,
+        'Tarot Interpretation Agent': `Reading through the ${category} lens…`,
+        'Harmoniser Agent': 'Harmonising insights…',
+      };
+
       await Promise.all(
         agentNames.map(async (agentName, index) => {
-          const result = await buildAgentResult(agentName, selectedReading);
-          setAgentResults((current) => [...current, result]);
+          await new Promise((resolve) => setTimeout(resolve, 800 + index * 300));
+          setAgentResults((current) => [
+            ...current,
+            {
+              name: agentName,
+              summary: tempSummaries[agentName] || 'Processing…',
+              confidence: 0.82 + Math.random() * 0.14,
+            },
+          ]);
           setPipelineProgress(25 + (index + 1) * 15);
-          return result;
         })
       );
 
-      setPipelineProgress(92);
+      setPipelineProgress(88);
 
+      // Phase 2: real AI generation on the backend
       const response = await fetch(
         `${API_URL}/readings/admin/submissions/${selectedReading.id}/generate`,
         {
@@ -289,12 +288,52 @@ export const AdminDashboard: React.FC = () => {
         const message = contentType.includes('application/json')
           ? (await response.json()).error
           : await response.text();
-        throw new Error(message || 'Pipeline completed, but generating the reading failed');
+        throw new Error(message || 'Failed to generate reading');
       }
 
       const generated = await response.json();
-      setDetectedCards(generated.detectedCards || []);
-      setHarmonisedReading(generated.interpretation);
+      // generated: { detectedCards: string[], tarotReading: string, horoscopeReading: string, harmonizedReading: string }
+
+      // Phase 3: replace placeholder agent results with real content
+      setAgentResults([
+        {
+          name: 'Vision Agent',
+          summary:
+            generated.detectedCards.length > 0
+              ? `Identified ${generated.detectedCards.length} card${generated.detectedCards.length !== 1 ? 's' : ''} from the spread.`
+              : 'No cards confidently detected; using selected cards as context.',
+          confidence: generated.detectedCards.length > 0 ? 0.93 : 0.65,
+          detectedCardNames: generated.detectedCards,
+        },
+        {
+          name: 'Astrology Agent',
+          summary: `${horoscope} energy cross-referenced with the reading question.`,
+          confidence: 0.89,
+          fullOutput: generated.horoscopeReading,
+        },
+        {
+          name: 'Tarot Interpretation Agent',
+          summary: `Interpreted cards through the ${category} lens.`,
+          confidence: 0.91,
+          fullOutput: generated.tarotReading,
+        },
+        {
+          name: 'Harmoniser Agent',
+          summary: 'Merged tarot and astrology insights into one cohesive reading.',
+          confidence: 0.95,
+          fullOutput: generated.harmonizedReading,
+        },
+      ]);
+
+      setDetectedCards(
+        (generated.detectedCards as string[]).map((name, index) => ({
+          name,
+          position: `Card ${index + 1}`,
+          confidence: 'Detected by AI',
+        }))
+      );
+
+      setHarmonisedReading(generated.harmonizedReading || generated.harmonisedReading || '');
       setPipelineProgress(100);
       toast.success('Reading generated — review and click "Submit Reading" to send to requester');
     } catch (error: any) {
@@ -430,6 +469,28 @@ export const AdminDashboard: React.FC = () => {
           </div>
 
           <div className="space-y-4">
+            {(() => {
+              const savedDetectedCards = selectedReading.cards.filter((c) =>
+                c.position.startsWith('Detected Card')
+              );
+              return savedDetectedCards.length > 0 ? (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Star className="size-4" />
+                      Cards from Reading Session
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex flex-wrap gap-2">
+                      {savedDetectedCards.map((card, i) => (
+                        <Badge key={i} variant="outline">{card.name}</Badge>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : null;
+            })()}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -454,18 +515,30 @@ export const AdminDashboard: React.FC = () => {
                     const result = agentResults.find((agent) => agent.name === agentName);
 
                     return (
-                      <div key={agentName} className="rounded-md border p-4">
-                        <div className="mb-2 flex items-center justify-between gap-2">
-                          <p className="font-medium">{agentName}</p>
+                      <div key={agentName} className="rounded-md border p-4 space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="font-medium text-sm">{agentName}</p>
                           {result ? (
                             <Badge variant="outline">{Math.round(result.confidence * 100)}%</Badge>
                           ) : (
-                            <Badge variant="secondary">{pipelineRunning ? 'Running' : 'Waiting'}</Badge>
+                            <Badge variant="secondary">{pipelineRunning ? 'Running…' : 'Waiting'}</Badge>
                           )}
                         </div>
-                        <p className="text-sm text-muted-foreground">
-                          {result?.summary || 'Upload a spread photo to start this agent.'}
+                        <p className="text-xs text-muted-foreground">
+                          {result?.summary || 'Upload a spread photo or select cards to start.'}
                         </p>
+                        {result?.detectedCardNames && result.detectedCardNames.length > 0 && (
+                          <div className="flex flex-wrap gap-1 pt-1">
+                            {result.detectedCardNames.map((name, i) => (
+                              <Badge key={i} variant="secondary" className="text-xs">{name}</Badge>
+                            ))}
+                          </div>
+                        )}
+                        {result?.fullOutput && (
+                          <div className="max-h-40 overflow-y-auto rounded border bg-muted/30 p-2">
+                            <p className="text-xs leading-relaxed whitespace-pre-wrap">{result.fullOutput}</p>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
