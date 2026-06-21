@@ -7,7 +7,6 @@ import { Textarea } from './ui/textarea';
 import { Progress } from './ui/progress';
 import { useAuth } from '../context/AuthContext';
 import { API_URL } from '../config/api';
-import { TAROT_CARDS } from '../data/mockData';
 import { ArrowLeft, Brain, Calendar, CheckCircle2, ImageUp, MapPin, Sparkles, Star, User } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -73,9 +72,8 @@ interface DetectedCard {
 }
 
 const agentNames = [
-  'Vision Agent',
-  'Astrology Agent',
   'Tarot Interpretation Agent',
+  'Astrology Agent',
 ];
 
 const statusStyles: Record<QueueStatus, string> = {
@@ -93,7 +91,6 @@ export const AdminDashboard: React.FC = () => {
     return stored ? JSON.parse(stored) : {};
   });
   const [spreadImage, setSpreadImage] = useState('');
-  const [selectedCards, setSelectedCards] = useState<string[]>([]);
   const [agentResults, setAgentResults] = useState<AgentResult[]>([]);
   const [pipelineRunning, setPipelineRunning] = useState(false);
   const [pipelineProgress, setPipelineProgress] = useState(0);
@@ -241,31 +238,11 @@ export const AdminDashboard: React.FC = () => {
     reader.readAsDataURL(file);
   };
 
-  const handleCardToggle = (card: string) => {
-    setSelectedCards((current) => {
-      if (current.includes(card)) {
-        return current.filter((selectedCard) => selectedCard !== card);
-      }
-
-      if (current.length >= 5) {
-        toast.error('Choose up to 5 cards');
-        return current;
-      }
-
-      return [...current, card];
-    });
-  };
-
   const runPipeline = async (image?: string) => {
     if (!selectedSubmission) return;
 
-    const cardsForReading = selectedCards.map((card, index) => ({
-      name: card,
-      position: `Selected Card ${index + 1}`,
-    }));
-
-    if (!image && cardsForReading.length === 0) {
-      toast.error('Upload a spread photo or select at least one card');
+    if (!image) {
+      toast.error('Upload a spread photo to start the pipeline');
       return;
     }
 
@@ -282,9 +259,8 @@ export const AdminDashboard: React.FC = () => {
     try {
       // Phase 1: simulate agent progress for visual feedback while real API call prepares
       const tempSummaries: Record<string, string> = {
-        'Vision Agent': 'Analysing card spread image…',
-        'Astrology Agent': `Processing ${horoscope} energy…`,
         'Tarot Interpretation Agent': `Reading through the ${category} lens…`,
+        'Astrology Agent': `Processing ${horoscope} energy…`,
       };
 
       await Promise.all(
@@ -315,7 +291,6 @@ export const AdminDashboard: React.FC = () => {
           },
           body: JSON.stringify({
             spreadImage: image,
-            cards: cardsForReading,
           }),
         }
       );
@@ -334,25 +309,16 @@ export const AdminDashboard: React.FC = () => {
       // Phase 3: replace placeholder agent results with real content
       setAgentResults([
         {
-          name: 'Vision Agent',
-          summary:
-            generated.detectedCards.length > 0
-              ? `Identified ${generated.detectedCards.length} card${generated.detectedCards.length !== 1 ? 's' : ''} from the spread.`
-              : 'No cards confidently detected; using selected cards as context.',
-          confidence: generated.detectedCards.length > 0 ? 0.93 : 0.65,
-          detectedCardNames: generated.detectedCards,
+          name: 'Tarot Interpretation Agent',
+          summary: `Interpreted cards through the ${category} lens.`,
+          confidence: 0.91,
+          fullOutput: generated.tarotReading,
         },
         {
           name: 'Astrology Agent',
           summary: `${horoscope} energy cross-referenced with the reading question.`,
           confidence: 0.89,
           fullOutput: generated.horoscopeReading,
-        },
-        {
-          name: 'Tarot Interpretation Agent',
-          summary: `Interpreted cards through the ${category} lens.`,
-          confidence: 0.91,
-          fullOutput: generated.tarotReading,
         },
       ]);
 
@@ -451,52 +417,14 @@ export const AdminDashboard: React.FC = () => {
                 {spreadImage && (
                   <img src={spreadImage} alt="Uploaded card spread" className="w-full rounded-md border object-cover" />
                 )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Sparkles className="size-5" />
-                  Selected Cards
-                </CardTitle>
-                <CardDescription>Choose up to 5 cards when no photo is available, or add them as context for the photo.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid max-h-56 grid-cols-2 gap-2 overflow-y-auto sm:grid-cols-3">
-                  {TAROT_CARDS.map((card) => (
-                    <Button
-                      key={card}
-                      type="button"
-                      variant={selectedCards.includes(card) ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => handleCardToggle(card)}
-                      disabled={!selectedCards.includes(card) && selectedCards.length >= 5}
-                      className="h-auto justify-start py-2 text-left text-xs"
-                    >
-                      {card}
-                    </Button>
-                  ))}
-                </div>
-
-                {selectedCards.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {selectedCards.map((card, index) => (
-                      <Badge key={card} variant="secondary">
-                        {index + 1}. {card}
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-
                 <Button
                   type="button"
                   onClick={() => runPipeline(spreadImage || undefined)}
-                  disabled={pipelineRunning || (!spreadImage && selectedCards.length === 0)}
+                  disabled={pipelineRunning || !spreadImage}
                   className="w-full"
                 >
                   <Sparkles className="size-4 mr-2" />
-                  Generate Gemini Reading
+                  Generate Reading
                 </Button>
               </CardContent>
             </Card>
@@ -539,14 +467,14 @@ export const AdminDashboard: React.FC = () => {
                   </div>
                 )}
 
-                <div className="grid gap-3 md:grid-cols-2">
+                <div className="space-y-4">
                   {agentNames.map((agentName) => {
                     const result = agentResults.find((agent) => agent.name === agentName);
 
                     return (
-                      <div key={agentName} className="rounded-md border p-4 space-y-2">
+                      <div key={agentName} className="rounded-md border p-4 space-y-3">
                         <div className="flex items-center justify-between gap-2">
-                          <p className="font-medium text-sm">{agentName}</p>
+                          <p className="font-medium">{agentName}</p>
                           {result ? (
                             <Badge variant="outline">{Math.round(result.confidence * 100)}%</Badge>
                           ) : (
@@ -554,18 +482,11 @@ export const AdminDashboard: React.FC = () => {
                           )}
                         </div>
                         <p className="text-xs text-muted-foreground">
-                          {result?.summary || 'Upload a spread photo or select cards to start.'}
+                          {result?.summary || 'Upload a spread photo to start.'}
                         </p>
-                        {result?.detectedCardNames && result.detectedCardNames.length > 0 && (
-                          <div className="flex flex-wrap gap-1 pt-1">
-                            {result.detectedCardNames.map((name, i) => (
-                              <Badge key={i} variant="secondary" className="text-xs">{name}</Badge>
-                            ))}
-                          </div>
-                        )}
                         {result?.fullOutput && (
-                          <div className="max-h-40 overflow-y-auto rounded border bg-muted/30 p-2">
-                            <p className="text-xs leading-relaxed whitespace-pre-wrap">{result.fullOutput}</p>
+                          <div className="rounded border bg-muted/30 p-3">
+                            <p className="text-sm leading-relaxed whitespace-pre-wrap">{result.fullOutput}</p>
                           </div>
                         )}
                       </div>

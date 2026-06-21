@@ -145,7 +145,7 @@ export function RequesterPortal({ onShowAuthModal }: { onShowAuthModal: () => vo
           {isFreeReading && (
             <Badge className="text-lg px-6 py-2 free-badge text-white border-0">
               <Sparkles className="size-4 mr-2" />
-              Your First Reading is FREE
+              Beta Version — Free Reading
             </Badge>
           )}
         </div>

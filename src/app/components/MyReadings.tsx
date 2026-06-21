@@ -148,8 +148,12 @@ export function MyReadings() {
                             {category}
                           </Badge>
                           {!isCompleted && (
-                            <Badge className="bg-amber-500/10 text-amber-700 border-amber-200">
-                              Pending
+                            <Badge className="bg-amber-500/10 text-amber-700 border-amber-200 flex items-center gap-1.5">
+                              <span className="relative flex size-2">
+                                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
+                                <span className="relative inline-flex size-2 rounded-full bg-amber-500" />
+                              </span>
+                              Reading in progress
                             </Badge>
                           )}
                         </CardDescription>

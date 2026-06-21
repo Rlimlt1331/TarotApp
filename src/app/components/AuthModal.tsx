@@ -77,6 +77,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ open, onOpenChange }) => {
               placeholder="your@email.com"
               required
             />
+            {mode === 'signup' && (
+              <p className="mt-1 text-xs text-muted-foreground">Your email is used as your account ID.</p>
+            )}
           </div>
 
           <div>
