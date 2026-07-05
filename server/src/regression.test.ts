@@ -198,12 +198,16 @@ test('Tarot App Regression Test Suite', async (t) => {
     assert.ok(res.status === 401 || res.status === 403, 'Non-admin should be rejected');
   });
 
-  await t.test('14. Admin: Generate AI Reading for Submission', async () => {
+  await t.test('14. Admin: Generate AI Reading — confirmedCards flow (skips vision detection)', async () => {
+    // New flow: reader has already confirmed cards; generate uses them directly without re-running vision.
     const res = await fetch(`${API_URL}/submissions/admin/${testSubmissionId}/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
       body: JSON.stringify({
-        cards: ['The Fool', 'The World'],
+        confirmedCards: [
+          { name: 'The Fool', orientation: 'upright' },
+          { name: 'The World', orientation: 'reversed' },
+        ],
       }),
     });
 
@@ -211,14 +215,42 @@ test('Tarot App Regression Test Suite', async (t) => {
     const data = await res.json() as any;
 
     assert.ok(Array.isArray(data.detectedCards), 'detectedCards should be an array');
+    assert.strictEqual(data.detectedCards.length, 2, 'Should reflect the two confirmed cards');
     data.detectedCards.forEach((card: any) => {
       assert.ok(typeof card.name === 'string', 'Each card should have a name');
       assert.ok(typeof card.orientation === 'string', 'Each card should have orientation');
+      assert.ok(['upright', 'reversed'].includes(card.orientation), 'Orientation should be upright or reversed');
     });
+
+    // Orientations should be preserved from the confirmed input
+    const fool = data.detectedCards.find((c: any) => c.name === 'The Fool');
+    const world = data.detectedCards.find((c: any) => c.name === 'The World');
+    assert.strictEqual(fool?.orientation, 'upright', 'The Fool orientation should be preserved');
+    assert.strictEqual(world?.orientation, 'reversed', 'The World orientation should be preserved');
 
     assert.ok(typeof data.tarotReading === 'string', 'Should include tarotReading');
     assert.ok(typeof data.horoscopeReading === 'string', 'Should include horoscopeReading');
     assert.ok(typeof data.harmonizedReading === 'string', 'Should include harmonizedReading');
+  });
+
+  await t.test('Admin: Detect Cards — rejects non-admin', async () => {
+    const res = await fetch(`${API_URL}/submissions/admin/${testSubmissionId}/detect-cards`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ spreadImage: 'data:image/png;base64,abc' }),
+    });
+    assert.ok(res.status === 401 || res.status === 403, 'Non-admin should be rejected from detect-cards');
+  });
+
+  await t.test('Admin: Detect Cards — returns 400 when spreadImage is missing', async () => {
+    const res = await fetch(`${API_URL}/submissions/admin/${testSubmissionId}/detect-cards`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+      body: JSON.stringify({}),
+    });
+    assert.strictEqual(res.status, 400, 'Should return 400 when spreadImage is not provided');
+    const data = await res.json() as any;
+    assert.ok(typeof data.error === 'string', 'Should return an error message');
   });
 
   await t.test('15. Admin: Save Reading to Database', async () => {

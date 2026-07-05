@@ -311,12 +311,14 @@ This reading invites you to reflect on the interconnected messages these cards b
 
 export async function generateAdvancedReading(
   image: string | undefined,
-  manualCards: string[],
+  manualCards: Array<string | { name: string; orientation?: string }>,
   question: string,
   horoscope: string
 ) {
   let detectedCardObjects: Array<{ name: string; orientation: string }> =
-    manualCards.map((name) => ({ name, orientation: 'upright' }));
+    manualCards.map((c) =>
+      typeof c === 'string' ? { name: c, orientation: 'upright' } : { name: c.name, orientation: c.orientation || 'upright' }
+    );
 
   if (image) {
     const analysis = await generateReadingAnalysis([], question, image);

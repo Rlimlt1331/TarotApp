@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import { prisma } from '../index.js';
-import { GeminiGenerationError, generateAdvancedReading } from '../services/geminiService.js';
+import { GeminiGenerationError, generateAdvancedReading, generateReadingAnalysis } from '../services/geminiService.js';
 import { verifyAdmin } from '../middleware/verifyAdmin.js';
 import { verifyToken, AuthRequest } from '../middleware/verifyToken.js';
 
@@ -80,11 +80,51 @@ router.get('/admin/all', verifyAdmin, async (_req: AuthRequest, res: Response) =
   }
 });
 
+// Detect cards from image only — admin only
+router.post('/admin/:id/detect-cards', verifyAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { spreadImage } = req.body;
+
+    if (!spreadImage) {
+      return res.status(400).json({ error: 'spreadImage is required' });
+    }
+
+    const submission = await prisma.submission.findUnique({
+      where: { id: parseInt(id) },
+    });
+
+    if (!submission) {
+      return res.status(404).json({ error: 'Submission not found' });
+    }
+
+    const analysis = await generateReadingAnalysis([], submission.question || '', spreadImage);
+
+    res.json({
+      detectedCards: analysis.detectedCards.map((c) => ({
+        name: c.name,
+        orientation: c.orientation || 'upright',
+        position: c.position,
+        confidence: c.confidence,
+      })),
+    });
+  } catch (error: any) {
+    console.error('Detect cards error:', error);
+    if (error instanceof GeminiGenerationError) {
+      return res.status(error.status).json({ error: error.message, retryDelay: error.retryDelay });
+    }
+    res.status(500).json({ error: 'Failed to detect cards' });
+  }
+});
+
 // Generate reading preview without saving — admin only
+// Accepts either:
+//   confirmedCards: [{name, orientation}]  — pre-confirmed cards (skips vision re-detection)
+//   spreadImage + cards                    — legacy: image-based detection or manual card names
 router.post('/admin/:id/generate', verifyAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const { spreadImage, image, cards = [] } = req.body;
+    const { spreadImage, image, cards = [], confirmedCards } = req.body;
 
     const submission = await prisma.submission.findUnique({
       where: { id: parseInt(id) },
@@ -96,12 +136,17 @@ router.post('/admin/:id/generate', verifyAdmin, async (req: AuthRequest, res: Re
 
     const horoscope = submission.horoscope || '';
     const question = submission.question || '';
-    const manualCards = Array.isArray(cards) && cards.length > 0
-      ? cards.map((c: any) => (typeof c === 'string' ? c : c.name))
-      : [];
+
+    // If caller passed pre-confirmed cards with orientation, use them and skip vision.
+    const hasConfirmed = Array.isArray(confirmedCards) && confirmedCards.length > 0;
+    const manualCards = hasConfirmed
+      ? confirmedCards
+      : Array.isArray(cards) && cards.length > 0
+        ? cards.map((c: any) => (typeof c === 'string' ? c : c.name))
+        : [];
 
     const generated = await generateAdvancedReading(
-      spreadImage || image,
+      hasConfirmed ? undefined : (spreadImage || image),
       manualCards,
       question,
       horoscope

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -7,7 +7,7 @@ import { Textarea } from './ui/textarea';
 import { Progress } from './ui/progress';
 import { useAuth } from '../context/AuthContext';
 import { API_URL } from '../config/api';
-import { ArrowLeft, Brain, Calendar, CheckCircle2, ImageUp, Sparkles, Star, User } from 'lucide-react';
+import { ArrowLeft, Brain, Calendar, CheckCircle2, ImageUp, Sparkles, Star, User, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -94,7 +94,7 @@ export const AdminDashboard: React.FC = () => {
   });
   const [spreadImage, setSpreadImage] = useState('');
   const [agentResults, setAgentResults] = useState<AgentResult[]>([]);
-  const [pipelineRunning, setPipelineRunning] = useState(false);
+  const [pipelinePhase, setPipelinePhase] = useState<'idle' | 'detecting' | 'confirming' | 'generating' | 'complete'>('idle');
   const [pipelineProgress, setPipelineProgress] = useState(0);
   const [harmonisedReading, setHarmonisedReading] = useState('');
   const [astrologyReading, setAstrologyReading] = useState('');
@@ -153,6 +153,7 @@ export const AdminDashboard: React.FC = () => {
     setSelectedSubmission(submission);
     setSpreadImage('');
     setAgentResults([]);
+    setPipelinePhase('idle');
     setPipelineProgress(0);
     setHarmonisedReading(submission.reading?.harmonisedReading || '');
     setAstrologyReading(submission.reading?.astrologyReading || '');
@@ -231,26 +232,90 @@ export const AdminDashboard: React.FC = () => {
     reader.readAsDataURL(file);
   };
 
-  const runPipeline = async (image?: string) => {
-    if (!selectedSubmission) return;
+  const pipelineRunning = pipelinePhase === 'detecting' || pipelinePhase === 'generating';
 
-    if (!image) {
-      toast.error('Upload a spread photo to start the pipeline');
+  // Step 1: vision-only card detection — reader reviews before generation
+  const detectCards = async () => {
+    if (!selectedSubmission || !spreadImage) {
+      toast.error('Upload a spread photo to detect cards');
       return;
     }
+
+    setPipelinePhase('detecting');
+    setDetectedCards([]);
+
+    try {
+      const response = await fetch(
+        `${API_URL}/submissions/admin/${selectedSubmission.id}/detect-cards`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ spreadImage }),
+        }
+      );
+
+      if (!response.ok) {
+        const contentType = response.headers.get('content-type') || '';
+        const message = contentType.includes('application/json')
+          ? (await response.json()).error
+          : await response.text();
+        throw new Error(message || 'Failed to detect cards');
+      }
+
+      const { detectedCards: cards } = await response.json();
+      setDetectedCards(
+        (cards as Array<{ name: string; orientation?: string; position?: string; confidence?: string }>)
+          .map((c, index) => ({
+            name: c.name,
+            orientation: c.orientation || 'upright',
+            position: c.position || `Card ${index + 1}`,
+            confidence: c.confidence,
+          }))
+      );
+      setPipelinePhase('confirming');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to detect cards');
+      setPipelinePhase('idle');
+    }
+  };
+
+  const updateConfirmedCardName = (index: number, name: string) => {
+    setDetectedCards((current) => current.map((c, i) => (i === index ? { ...c, name } : c)));
+  };
+
+  const toggleConfirmedCardOrientation = (index: number) => {
+    setDetectedCards((current) =>
+      current.map((c, i) =>
+        i === index ? { ...c, orientation: c.orientation === 'upright' ? 'reversed' : 'upright' } : c
+      )
+    );
+  };
+
+  const removeConfirmedCard = (index: number) => {
+    setDetectedCards((current) => current.filter((_, i) => i !== index));
+  };
+
+  const addConfirmedCard = () => {
+    setDetectedCards((current) => [
+      ...current,
+      { name: '', orientation: 'upright', position: `Card ${current.length + 1}` },
+    ]);
+  };
+
+  // Step 2: generate tarot/horoscope/harmonise using the confirmed card list
+  const generateFromConfirmed = async () => {
+    if (!selectedSubmission || detectedCards.filter((c) => c.name.trim()).length === 0) return;
 
     const horoscope = selectedSubmission.horoscope || 'unknown';
     const category = selectedSubmission.category || 'general';
 
-    setPipelineRunning(true);
+    setPipelinePhase('generating');
     setPipelineProgress(15);
     setAgentResults([]);
     setHarmonisedReading('');
-    setDetectedCards([]);
     updateStatus(selectedSubmission.id, 'processing');
 
     try {
-      // Phase 1: simulate agent progress for visual feedback while real API call prepares
       const tempSummaries: Record<string, string> = {
         'Tarot Interpretation Agent': `Reading through the ${category} lens…`,
         'Astrology Agent': `Processing ${horoscope} energy…`,
@@ -261,11 +326,7 @@ export const AdminDashboard: React.FC = () => {
           await new Promise((resolve) => setTimeout(resolve, 800 + index * 300));
           setAgentResults((current) => [
             ...current,
-            {
-              name: agentName,
-              summary: tempSummaries[agentName] || 'Processing…',
-              confidence: 0.82 + Math.random() * 0.14,
-            },
+            { name: agentName, summary: tempSummaries[agentName] || 'Processing…', confidence: 0.82 + Math.random() * 0.14 },
           ]);
           setPipelineProgress(25 + (index + 1) * 15);
         })
@@ -273,17 +334,15 @@ export const AdminDashboard: React.FC = () => {
 
       setPipelineProgress(88);
 
-      // Phase 2: real AI generation on the backend
       const response = await fetch(
         `${API_URL}/submissions/admin/${selectedSubmission.id}/generate`,
         {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify({
-            spreadImage: image,
+            confirmedCards: detectedCards
+              .filter((c) => c.name.trim())
+              .map((c) => ({ name: c.name, orientation: c.orientation || 'upright' })),
           }),
         }
       );
@@ -297,9 +356,7 @@ export const AdminDashboard: React.FC = () => {
       }
 
       const generated = await response.json();
-      // generated: { detectedCards: {name, orientation}[], tarotReading, horoscopeReading, harmonizedReading }
 
-      // Phase 3: replace placeholder agent results with real content
       setAgentResults([
         {
           name: 'Tarot Interpretation Agent',
@@ -315,25 +372,17 @@ export const AdminDashboard: React.FC = () => {
         },
       ]);
 
-      setDetectedCards(
-        (generated.detectedCards as Array<{ name: string; orientation?: string }>).map((card, index) => ({
-          name: card.name,
-          orientation: card.orientation,
-          position: `Card ${index + 1}`,
-          confidence: 'Detected by AI',
-        }))
-      );
-
       setAstrologyReading(generated.horoscopeReading || '');
       setTarotReading(generated.tarotReading || '');
       setHarmonisedReading(generated.harmonizedReading || generated.harmonisedReading || '');
       setPipelineProgress(100);
+      setPipelinePhase('complete');
       toast.success('Reading generated — review and click "Submit Reading" to send to requester');
     } catch (error: any) {
       toast.error(error.message || 'Failed to run AI pipeline');
       updateStatus(selectedSubmission.id, 'pending');
-    } finally {
-      setPipelineRunning(false);
+      setPipelineProgress(0);
+      setPipelinePhase('confirming');
     }
   };
 
@@ -409,7 +458,7 @@ export const AdminDashboard: React.FC = () => {
                     <ImageUp className="size-5" />
                     Card Spread
                   </CardTitle>
-                  <CardDescription>Uploading a spread photo starts the AI pipeline.</CardDescription>
+                  <CardDescription>Upload a spread photo to detect and confirm cards.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <Input type="file" accept="image/*" onChange={handleImageUpload} disabled={pipelineRunning} />
@@ -418,12 +467,12 @@ export const AdminDashboard: React.FC = () => {
                   )}
                   <Button
                     type="button"
-                    onClick={() => runPipeline(spreadImage || undefined)}
-                    disabled={pipelineRunning || !spreadImage}
+                    onClick={detectCards}
+                    disabled={pipelineRunning || !spreadImage || pipelinePhase === 'confirming'}
                     className="w-full"
                   >
                     <Sparkles className="size-4 mr-2" />
-                    Generate Reading
+                    {pipelinePhase === 'detecting' ? 'Detecting…' : 'Detect Cards'}
                   </Button>
                 </CardContent>
               </Card>
@@ -433,8 +482,65 @@ export const AdminDashboard: React.FC = () => {
           {/* RIGHT COLUMN */}
           <div className="space-y-4">
 
-            {/* Unified Cards from Reading Session */}
-            {(cardsToDisplay.length > 0 || (pipelineRunning && !isCompleted)) && (
+            {/* Card Confirmation — shown after detection, before generation */}
+            {!isCompleted && pipelinePhase === 'confirming' && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Star className="size-4" />
+                    Confirm Detected Cards
+                  </CardTitle>
+                  <CardDescription>
+                    Fix any card names or toggle upright/reversed before generating the reading.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {detectedCards.map((card, index) => (
+                    <div key={index} className="flex items-center gap-2 rounded-md border p-2">
+                      <Badge variant="secondary">{index + 1}</Badge>
+                      <Input
+                        value={card.name}
+                        onChange={(e) => updateConfirmedCardName(index, e.target.value)}
+                        className="flex-1 h-8 text-sm"
+                        placeholder="Card name"
+                      />
+                      <Button
+                        size="sm"
+                        variant={card.orientation === 'upright' ? 'default' : 'outline'}
+                        onClick={() => toggleConfirmedCardOrientation(index)}
+                        className="shrink-0 h-8 px-3 text-xs"
+                      >
+                        {card.orientation === 'upright' ? '↑ Upright' : '↓ Reversed'}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => removeConfirmedCard(index)}
+                        className="shrink-0 h-8 w-8 p-0"
+                      >
+                        <X className="size-3" />
+                      </Button>
+                    </div>
+                  ))}
+                  <Button variant="outline" size="sm" onClick={addConfirmedCard} className="w-full">
+                    + Add Card
+                  </Button>
+                </CardContent>
+                <CardFooter>
+                  <Button
+                    onClick={generateFromConfirmed}
+                    disabled={detectedCards.filter((c) => c.name.trim()).length === 0}
+                    className="w-full"
+                  >
+                    <Sparkles className="size-4 mr-2" />
+                    Generate Reading
+                  </Button>
+                </CardFooter>
+              </Card>
+            )}
+
+            {/* Cards from Reading Session — shown when not in confirmation phase */}
+            {pipelinePhase !== 'confirming' && (cardsToDisplay.length > 0 || (pipelinePhase === 'generating' && !isCompleted)) && (
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2 text-base">
@@ -443,8 +549,8 @@ export const AdminDashboard: React.FC = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {pipelineRunning && cardsToDisplay.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Detecting cards from image…</p>
+                  {pipelinePhase === 'generating' && cardsToDisplay.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Generating reading…</p>
                   ) : (
                     <div className="space-y-2">
                       {cardsToDisplay.map((card, index) => (
@@ -500,21 +606,27 @@ export const AdminDashboard: React.FC = () => {
               </>
             )}
 
-            {/* PENDING/PROCESSING: live agent pipeline */}
-            {!isCompleted && (
+            {/* PENDING/PROCESSING: live agent pipeline — hidden during confirmation */}
+            {!isCompleted && pipelinePhase !== 'confirming' && (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Brain className="size-5" />
                     Multi-Agent Pipeline
                   </CardTitle>
-                  <CardDescription>Gemini reads the photo and generates the interpretation.</CardDescription>
+                  <CardDescription>Gemini agents generate the tarot and horoscope interpretation.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {(pipelineRunning || pipelineProgress > 0) && (
+                  {pipelinePhase === 'detecting' && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-primary shrink-0" />
+                      Analysing image and detecting cards…
+                    </div>
+                  )}
+                  {(pipelinePhase === 'generating' || pipelinePhase === 'complete') && pipelineProgress > 0 && (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
-                        <span>{pipelineRunning ? 'Agents processing...' : 'Pipeline complete'}</span>
+                        <span>{pipelinePhase === 'generating' ? 'Agents processing...' : 'Pipeline complete'}</span>
                         <span>{Math.round(pipelineProgress)}%</span>
                       </div>
                       <Progress value={pipelineProgress} />
@@ -530,11 +642,13 @@ export const AdminDashboard: React.FC = () => {
                             {result ? (
                               <Badge variant="outline">{Math.round(result.confidence * 100)}%</Badge>
                             ) : (
-                              <Badge variant="secondary">{pipelineRunning ? 'Running…' : 'Waiting'}</Badge>
+                              <Badge variant="secondary">
+                                {pipelinePhase === 'generating' ? 'Running…' : 'Waiting'}
+                              </Badge>
                             )}
                           </div>
                           <p className="text-xs text-muted-foreground">
-                            {result?.summary || 'Upload a spread photo to start.'}
+                            {result?.summary || 'Detect and confirm cards to start.'}
                           </p>
                           {result?.fullOutput && (
                             <div className="rounded border bg-muted/30 p-3">

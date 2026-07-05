@@ -11,17 +11,26 @@ const router = Router();
 // Generate advanced reading draft without saving
 router.post('/generate-draft', verifyToken, async (req: AuthRequest, res: Response) => {
   try {
-    const { image, cards = [], question, horoscope } = req.body;
+    const { image, cards = [], confirmedCards, question, horoscope } = req.body;
 
     if (!question || !horoscope) {
       return res.status(400).json({ error: 'Question and horoscope are required' });
     }
 
-    if (!Array.isArray(cards) && !image) {
+    // confirmedCards takes priority (pre-confirmed with orientation); fall back to names-only cards or image.
+    const hasConfirmed = Array.isArray(confirmedCards) && confirmedCards.length > 0;
+    const resolvedCards = hasConfirmed ? confirmedCards : cards;
+
+    if (!resolvedCards.length && !image) {
       return res.status(400).json({ error: 'Provide selected cards or an uploaded image' });
     }
 
-    const advancedReading = await generateAdvancedReading(image, cards, question, horoscope);
+    const advancedReading = await generateAdvancedReading(
+      hasConfirmed ? undefined : image,
+      resolvedCards,
+      question,
+      horoscope
+    );
     res.json(advancedReading);
   } catch (error: any) {
     console.error('Generate draft error:', error);
