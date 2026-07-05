@@ -1,10 +1,10 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-const PRIMARY_GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite';
+const PRIMARY_GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 const GEMINI_MODELS = [
   PRIMARY_GEMINI_MODEL,
-  ...(process.env.GEMINI_FALLBACK_MODELS || 'gemini-2.5-flash,gemini-1.5-flash')
+  ...(process.env.GEMINI_FALLBACK_MODELS || 'gemini-2.5-flash-lite,gemini-1.5-flash')
     .split(',')
     .map((model) => model.trim())
     .filter(Boolean),
@@ -128,21 +128,30 @@ function getGeminiErrorMessage(error: any, modelName: string) {
   return `Gemini generation failed while using model "${modelName}".`;
 }
 
+// After a fallback succeeds, remember its index so the next call skips straight
+// to it instead of wasting attempts on a known-failing primary model.
+let stickyModelIndex = 0;
+
 async function generateContentWithFallback(content: any) {
   let lastError: any;
-  let lastModel = GEMINI_MODELS[0];
 
-  for (const modelName of GEMINI_MODELS) {
-    lastModel = modelName;
+  // Start from the last model that worked, then wrap around to cover all models.
+  const orderedModels = [
+    ...GEMINI_MODELS.slice(stickyModelIndex),
+    ...GEMINI_MODELS.slice(0, stickyModelIndex),
+  ];
+
+  for (const modelName of orderedModels) {
     const model = genAI.getGenerativeModel({ model: modelName });
     const attempts = 2;
 
     for (let attempt = 1; attempt <= attempts; attempt += 1) {
       try {
-        return {
-          result: await model.generateContent(content),
-          modelName,
-        };
+        const result = await model.generateContent(content);
+        // Advance the sticky index so the next call starts here.
+        const idx = GEMINI_MODELS.indexOf(modelName);
+        if (idx !== -1) stickyModelIndex = idx;
+        return { result, modelName };
       } catch (error: any) {
         lastError = error;
         console.error(`Gemini API error while using model "${modelName}" (attempt ${attempt}/${attempts}):`, error);
@@ -162,7 +171,7 @@ async function generateContentWithFallback(content: any) {
   }
 
   throw new GeminiGenerationError(
-    `${getGeminiErrorMessage(lastError, lastModel)} Tried models: ${GEMINI_MODELS.join(', ')}.`,
+    `${getGeminiErrorMessage(lastError, orderedModels[orderedModels.length - 1])} Tried models: ${GEMINI_MODELS.join(', ')}.`,
     lastError?.status || 502,
     getRetryDelay(lastError)
   );
@@ -336,11 +345,14 @@ export async function generateAdvancedReading(
       .join(', ');
 
     const tarotPrompt = `You are a Tarot Vision AI. Based on the cards: ${cardSummary} and the question: "${question}", provide a focused tarot reading. Note the orientation (upright/reversed) of each card as it affects the reading.`;
-    const tarotResult = await generateContentWithFallback(tarotPrompt);
-    const tarotReading = tarotResult.result.response.text();
-
     const horoscopePrompt = `You are a Horoscope AI. The user's horoscope is ${horoscope}. Based on their sign, the cards: ${cardNames.join(', ')} and the question: "${question}", provide a horoscope reading.`;
-    const horoscopeResult = await generateContentWithFallback(horoscopePrompt);
+
+    // Run tarot and horoscope in parallel — they're independent.
+    const [tarotResult, horoscopeResult] = await Promise.all([
+      generateContentWithFallback(tarotPrompt),
+      generateContentWithFallback(horoscopePrompt),
+    ]);
+    const tarotReading = tarotResult.result.response.text();
     const horoscopeReading = horoscopeResult.result.response.text();
 
     const harmonizePrompt = `You are an expert harmonizer. Combine the following Tarot reading and Horoscope reading into a single cohesive, harmonized reading for the user's question: "${question}".\n\nTarot Reading: ${tarotReading}\n\nHoroscope Reading: ${horoscopeReading}`;
