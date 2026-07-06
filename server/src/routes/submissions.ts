@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { prisma } from '../index.js';
 import { GeminiGenerationError, generateAdvancedReading, generateReadingAnalysis } from '../services/geminiService.js';
+import { notifyReaderNewSubmission, notifyRequesterReadingReady } from '../services/telegramService.js';
 import { verifyAdmin } from '../middleware/verifyAdmin.js';
 import { verifyToken, AuthRequest } from '../middleware/verifyToken.js';
 
@@ -33,6 +34,15 @@ router.post('/', verifyToken, async (req: AuthRequest, res: Response) => {
         feedbacks: true,
       },
     });
+
+    // Fire-and-forget: alert the reader on Telegram. Never block the response.
+    notifyReaderNewSubmission({
+      id: submission.id,
+      question: submission.question,
+      category: submission.category,
+      horoscope: submission.horoscope,
+      user: { name: submission.user.name, email: submission.user.email },
+    }).catch((err) => console.error('Telegram reader alert failed:', err));
 
     res.status(201).json(submission);
   } catch (error: any) {
@@ -230,6 +240,23 @@ router.put('/admin/:id', verifyAdmin, async (req: AuthRequest, res: Response) =>
         feedbacks: true,
       },
     });
+
+    // Fire-and-forget: notify the requester via Telegram if they've linked their account.
+    if (finalSubmission) {
+      prisma.user.findUnique({
+        where: { id: finalSubmission.userId },
+        select: { telegramChatId: true, telegramNotifyMode: true },
+      }).then((requester) => {
+        if (requester?.telegramChatId && requester?.telegramNotifyMode) {
+          notifyRequesterReadingReady(
+            requester.telegramChatId,
+            finalSubmission.question,
+            requester.telegramNotifyMode as 'notify' | 'deliver',
+            finalSubmission.reading?.harmonisedReading
+          ).catch((err) => console.error('Telegram requester notification failed:', err));
+        }
+      }).catch((err) => console.error('Telegram requester lookup failed:', err));
+    }
 
     res.json(finalSubmission);
   } catch (error: any) {
