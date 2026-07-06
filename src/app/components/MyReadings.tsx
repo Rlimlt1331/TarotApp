@@ -231,27 +231,9 @@ export function MyReadings() {
                   </div>
                 )}
 
-                {selectedSubmission.reading?.tarotReading && (
-                  <div>
-                    <h3 className="font-medium mb-3">Tarot Reading:</h3>
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                      {selectedSubmission.reading.tarotReading}
-                    </p>
-                  </div>
-                )}
-
-                {selectedSubmission.reading?.astrologyReading && (
-                  <div>
-                    <h3 className="font-medium mb-3">Astrology Reading:</h3>
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                      {selectedSubmission.reading.astrologyReading}
-                    </p>
-                  </div>
-                )}
-
                 {selectedSubmission.reading?.harmonisedReading && (
                   <div>
-                    <h3 className="font-medium mb-3">Harmonised Reading:</h3>
+                    <h3 className="font-medium mb-3">Your Reading:</h3>
                     <p className="text-sm leading-relaxed whitespace-pre-wrap">
                       {selectedSubmission.reading.harmonisedReading}
                     </p>
