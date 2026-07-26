@@ -490,11 +490,44 @@ async function run() {
   }
 
   await browser.close();
+  await cleanupTestData();
 
   console.log('\n══════════════════════════════════════════');
   console.log(` Results: ${tests.length - failed} passed, ${failed} failed`);
   console.log('══════════════════════════════════════════\n');
   if (failed > 0) process.exit(1);
+}
+
+// Delete all @test.local users and their associated data from the DB.
+// Runs after every test execution so the production DB stays clean.
+async function cleanupTestData() {
+  const fs = await import('fs');
+  let dbUrl = '';
+  try {
+    const env = fs.readFileSync(`${process.cwd()}/server/.env`, 'utf8');
+    const match = env.match(/^DATABASE_URL="?([^"\n]+)"?/m);
+    if (match) dbUrl = match[1];
+  } catch { /* ignore */ }
+  if (!dbUrl) { console.log('⚠️  Could not read DATABASE_URL — skipping cleanup'); return; }
+
+  const pg = await import('pg');
+  const client = new pg.default.Client({ connectionString: dbUrl });
+  try {
+    await client.connect();
+    const { rows } = await client.query(`SELECT id FROM users WHERE email LIKE '%@test.local'`);
+    if (!rows.length) { console.log('🧹 No test data to clean up'); return; }
+    const ids = rows.map(r => r.id);
+    const ph = ids.map((_, i) => `$${i + 1}`).join(',');
+    await client.query(`DELETE FROM gem_transactions WHERE "userId" IN (${ph})`, ids);
+    await client.query(`DELETE FROM feedbacks WHERE "submissionId" IN (SELECT id FROM submissions WHERE "userId" IN (${ph}))`, ids);
+    await client.query(`DELETE FROM submissions WHERE "userId" IN (${ph})`, ids);
+    await client.query(`DELETE FROM users WHERE id IN (${ph})`, ids);
+    console.log(`🧹 Cleaned up ${ids.length} test user(s) and their data`);
+  } catch (e) {
+    console.log(`⚠️  Cleanup failed: ${e.message}`);
+  } finally {
+    await client.end().catch(() => {});
+  }
 }
 
 run().catch(e => { console.error(e); process.exit(1); });
