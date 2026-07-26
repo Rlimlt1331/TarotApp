@@ -124,6 +124,7 @@ enum UserRole {
 
 enum GemTransactionType {
   purchase
+  pending_purchase
   reading_spend
   rating_bonus
   free_reading

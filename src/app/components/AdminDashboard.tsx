@@ -7,9 +7,20 @@ import { Textarea } from './ui/textarea';
 import { Progress } from './ui/progress';
 import { useAuth } from '../context/AuthContext';
 import { API_URL } from '../config/api';
-import { ArrowLeft, Brain, Calendar, CheckCircle2, ImageUp, Sparkles, Star, User, X } from 'lucide-react';
+import { ArrowLeft, Brain, Calendar, CheckCircle2, Gem, ImageUp, Sparkles, Star, User, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+
+interface PendingPurchase {
+  id: number;
+  userId: number;
+  userName: string | null;
+  userEmail: string | null;
+  packId: string | null;
+  gems: number;
+  pack: { id: string; priceSGD: number; totalGems: number } | null;
+  requestedAt: string;
+}
 
 type QueueStatus = 'pending' | 'processing' | 'completed';
 
@@ -85,6 +96,7 @@ const statusStyles: Record<QueueStatus, string> = {
 };
 
 export const AdminDashboard: React.FC = () => {
+  const [view, setView] = useState<'queue' | 'gems'>('queue');
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
@@ -101,11 +113,20 @@ export const AdminDashboard: React.FC = () => {
   const [tarotReading, setTarotReading] = useState('');
   const [detectedCards, setDetectedCards] = useState<DetectedCard[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  // Gem credits state
+  const [pendingPurchases, setPendingPurchases] = useState<PendingPurchase[]>([]);
+  const [gemsLoading, setGemsLoading] = useState(false);
+  const [crediting, setCrediting] = useState<number | null>(null);
   const { token } = useAuth();
 
   useEffect(() => {
     fetchSubmissions();
+    fetchPendingPurchases();
   }, [token]);
+
+  useEffect(() => {
+    if (view === 'gems') fetchPendingPurchases();
+  }, [view]);
 
   useEffect(() => {
     localStorage.setItem('tarot_admin_statuses', JSON.stringify(statuses));
@@ -116,6 +137,51 @@ export const AdminDashboard: React.FC = () => {
     const submission = submissions.find(s => s.id === submissionId);
     if (submission?.reading) return 'completed';
     return 'pending';
+  };
+
+  const fetchPendingPurchases = async () => {
+    if (!token) return;
+    setGemsLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/gems/admin/pending`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPendingPurchases(data.pending);
+      }
+    } catch (err: any) {
+      toast.error('Failed to load pending purchases');
+    } finally {
+      setGemsLoading(false);
+    }
+  };
+
+  const creditGems = async (purchase: PendingPurchase) => {
+    if (!token) return;
+    setCrediting(purchase.id);
+    try {
+      const res = await fetch(`${API_URL}/gems/admin/credit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          userId: purchase.userId,
+          packId: purchase.packId,
+          pendingId: purchase.id,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to credit gems');
+      }
+      const data = await res.json();
+      toast.success(`${data.message} to ${purchase.userName || purchase.userEmail}`);
+      await fetchPendingPurchases();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to credit gems');
+    } finally {
+      setCrediting(null);
+    }
   };
 
   const fetchSubmissions = async () => {
@@ -709,14 +775,89 @@ export const AdminDashboard: React.FC = () => {
     );
   }
 
+  if (view === 'gems') {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold mb-1">Gem Credits</h1>
+            <p className="text-gray-600">Verify PayNow payments and credit gems to requesters.</p>
+          </div>
+          <Button variant="outline" onClick={() => setView('queue')}>
+            <ArrowLeft className="size-4 mr-2" />
+            Back to Queue
+          </Button>
+        </div>
+
+        {gemsLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary" />
+          </div>
+        ) : pendingPurchases.length === 0 ? (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <Gem className="size-10 text-muted-foreground mx-auto mb-3" />
+              <p className="text-gray-500">No pending payment requests</p>
+              <p className="text-xs text-muted-foreground mt-1">Requests appear here when a user selects a gem pack and initiates payment.</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-3">
+            {pendingPurchases.map((p) => (
+              <Card key={p.id}>
+                <CardContent className="py-4">
+                  <div className="flex items-center justify-between gap-4 flex-wrap">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <User className="size-4 text-muted-foreground" />
+                        <span className="font-medium">{p.userName || '(no name)'}</span>
+                        {p.userEmail && <span className="text-sm text-muted-foreground">{p.userEmail}</span>}
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Gem className="size-3.5 text-purple-500" />
+                        <span>
+                          {p.pack ? `${p.pack.id.replace('pack_', '$')} SGD — ${p.gems} Gems` : `${p.gems} Gems`}
+                        </span>
+                        <span>·</span>
+                        <Calendar className="size-3.5" />
+                        <span>{format(new Date(p.requestedAt), 'MMM dd, yyyy HH:mm')}</span>
+                      </div>
+                    </div>
+                    <Button
+                      onClick={() => creditGems(p)}
+                      disabled={crediting === p.id}
+                      className="bg-purple-600 hover:bg-purple-700 text-white shrink-0"
+                    >
+                      <CheckCircle2 className="size-4 mr-2" />
+                      {crediting === p.id ? 'Crediting…' : `Credit ${p.gems} Gems`}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Reader Portal</h1>
-        <p className="text-gray-600">Review requester submissions and process card spread readings.</p>
+      <div className="mb-8 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold mb-2">Reader Portal</h1>
+          <p className="text-gray-600">Review requester submissions and process card spread readings.</p>
+        </div>
+        <Button variant="outline" onClick={() => setView('gems')} className="shrink-0">
+          <Gem className="size-4 mr-2 text-purple-500" />
+          Gem Credits
+          {pendingPurchases.length > 0 && (
+            <Badge className="ml-2 bg-purple-600 text-white border-0 text-xs">{pendingPurchases.length}</Badge>
+          )}
+        </Button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3 mb-8">
+      <div className="grid gap-4 md:grid-cols-3 mb-6">
         {(['pending', 'processing', 'completed'] as QueueStatus[]).map((status) => (
           <Card key={status}>
             <CardHeader className="pb-2">

@@ -28,7 +28,14 @@ router.get('/balance', verifyToken, async (req: AuthRequest, res: Response) => {
       take: 50,
     });
 
-    res.json({ gemBalance: user?.gemBalance ?? 0, freeReadingUsed: user?.freeReadingUsed ?? false, transactions });
+    const hasPendingPurchase = transactions.some((t) => t.type === 'pending_purchase');
+
+    res.json({
+      gemBalance: user?.gemBalance ?? 0,
+      freeReadingUsed: user?.freeReadingUsed ?? false,
+      hasPendingPurchase,
+      transactions,
+    });
   } catch (err) {
     console.error('Gem balance error:', err);
     res.status(500).json({ error: 'Failed to fetch gem balance' });
@@ -41,7 +48,7 @@ router.get('/packs', (_req, res: Response) => {
 });
 
 // Request a gem pack purchase (PayNow — manual fulfilment)
-// The user signals intent; an admin confirms payment and credits gems via /admin/credit.
+// Records a pending_purchase transaction; admin fulfils via /admin/credit.
 router.post('/purchase-request', verifyToken, async (req: AuthRequest, res: Response) => {
   try {
     const { packId } = req.body;
@@ -50,8 +57,18 @@ router.post('/purchase-request', verifyToken, async (req: AuthRequest, res: Resp
       return res.status(400).json({ error: 'Invalid pack selected' });
     }
 
+    const pendingTx = await prisma.gemTransaction.create({
+      data: {
+        userId: req.userId!,
+        type: 'pending_purchase',
+        amount: pack.totalGems,
+        referenceId: packId,
+      },
+    });
+
     res.json({
       message: 'Purchase request received',
+      pendingId: pendingTx.id,
       pack,
       instructions: `Please pay SGD ${pack.priceSGD} via PayNow. Screenshot your payment and send it to the admin for gem credit.`,
     });
@@ -61,16 +78,44 @@ router.post('/purchase-request', verifyToken, async (req: AuthRequest, res: Resp
   }
 });
 
-// Admin: manually credit gems after verifying PayNow payment
+// Admin: list all pending purchase requests
+router.get('/admin/pending', verifyToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const adminUser = await prisma.user.findUnique({ where: { id: req.userId! }, select: { role: true } });
+    if (adminUser?.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+
+    const pending = await prisma.gemTransaction.findMany({
+      where: { type: 'pending_purchase' },
+      include: { user: { select: { id: true, email: true, name: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.json({ pending: pending.map((t) => ({
+      id: t.id,
+      userId: t.userId,
+      userName: t.user.name,
+      userEmail: t.user.email,
+      packId: t.referenceId,
+      gems: t.amount,
+      pack: GEM_PACKS.find((p) => p.id === t.referenceId) || null,
+      requestedAt: t.createdAt,
+    })) });
+  } catch (err) {
+    console.error('Pending purchases error:', err);
+    res.status(500).json({ error: 'Failed to fetch pending purchases' });
+  }
+});
+
+// Admin: credit gems after verifying PayNow payment
+// pendingId: optional — if provided, deletes the pending_purchase record
 router.post('/admin/credit', verifyToken, async (req: AuthRequest, res: Response) => {
   try {
-    // Must be admin
     const adminUser = await prisma.user.findUnique({ where: { id: req.userId! }, select: { role: true } });
     if (adminUser?.role !== 'admin') {
       return res.status(403).json({ error: 'Forbidden' });
     }
 
-    const { userId, packId, note } = req.body;
+    const { userId, packId, pendingId, note } = req.body;
     const pack = GEM_PACKS.find((p) => p.id === packId);
     if (!pack || !userId) {
       return res.status(400).json({ error: 'userId and valid packId are required' });
@@ -91,6 +136,11 @@ router.post('/admin/credit', verifyToken, async (req: AuthRequest, res: Response
         },
       }),
     ]);
+
+    // Remove the pending_purchase record now that it's been fulfilled
+    if (pendingId) {
+      await prisma.gemTransaction.delete({ where: { id: pendingId } }).catch(() => {});
+    }
 
     res.json({ message: `Credited ${pack.totalGems} gems`, user: updatedUser, transaction });
   } catch (err) {

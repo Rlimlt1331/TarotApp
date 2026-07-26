@@ -18,7 +18,7 @@ import { GemPurchaseModal } from './GemPurchaseModal';
 
 export function RequesterPortal({ onShowAuthModal }: { onShowAuthModal: () => void }) {
   const { currentUser, addRequest } = useTarot();
-  const { user, token, gemBalance, freeReadingUsed, refreshGems } = useAuth();
+  const { user, token, gemBalance, freeReadingUsed, hasPendingPurchase, refreshGems } = useAuth();
   const { pendingSubmission, setPendingSubmission, clearPendingSubmission } = usePendingSubmission();
   const [selectedCategory, setSelectedCategory] = useState<ReadingCategory>('relationships');
   const [customQuestion, setCustomQuestion] = useState('');
@@ -330,15 +330,26 @@ export function RequesterPortal({ onShowAuthModal }: { onShowAuthModal: () => vo
           </Card>
 
           {user && !isFreeReading && !hasEnoughGems && (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-center space-y-2">
-              <p className="text-sm font-medium text-amber-800">
-                You need 20 Gems to submit a reading request. Your current balance: {gemBalance} Gems.
-              </p>
-              <Button size="sm" onClick={() => setGemModalOpen(true)} className="bg-purple-600 hover:bg-purple-700 text-white">
-                <Gem className="size-4 mr-2" />
-                Buy Gems
-              </Button>
-            </div>
+            hasPendingPurchase ? (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center space-y-1">
+                <p className="text-sm font-medium text-blue-800">
+                  Payment pending verification
+                </p>
+                <p className="text-xs text-blue-700">
+                  Your payment is being reviewed. Gems will be credited to your account within 24 hours, after which you can submit your reading.
+                </p>
+              </div>
+            ) : (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-center space-y-2">
+                <p className="text-sm font-medium text-amber-800">
+                  You need 20 Gems to submit a reading request. Your current balance: {gemBalance} Gems.
+                </p>
+                <Button size="sm" onClick={() => setGemModalOpen(true)} className="bg-purple-600 hover:bg-purple-700 text-white">
+                  <Gem className="size-4 mr-2" />
+                  Buy Gems
+                </Button>
+              </div>
+            )
           )}
 
           <Button

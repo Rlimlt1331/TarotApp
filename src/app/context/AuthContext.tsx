@@ -14,6 +14,7 @@ interface AuthContextType {
   loading: boolean;
   gemBalance: number;
   freeReadingUsed: boolean;
+  hasPendingPurchase: boolean;
   refreshGems: () => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   loginWithTelegramToken: (telegramToken: string) => Promise<void>;
@@ -46,6 +47,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [loading, setLoading] = useState(true);
   const [gemBalance, setGemBalance] = useState(0);
   const [freeReadingUsed, setFreeReadingUsed] = useState(false);
+  const [hasPendingPurchase, setHasPendingPurchase] = useState(false);
 
   const refreshGems = useCallback(async () => {
     const tok = localStorage.getItem('tarot_token');
@@ -58,6 +60,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const data = await res.json();
         setGemBalance(data.gemBalance ?? 0);
         setFreeReadingUsed(data.freeReadingUsed ?? false);
+        setHasPendingPurchase(data.hasPendingPurchase ?? false);
       }
     } catch {
       // non-fatal
@@ -129,6 +132,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 const gemsData = await gemsRes.json();
                 setGemBalance(gemsData.gemBalance ?? 0);
                 setFreeReadingUsed(gemsData.freeReadingUsed ?? false);
+                setHasPendingPurchase(gemsData.hasPendingPurchase ?? false);
               }
             } catch { /* non-fatal */ }
           } else {
@@ -218,6 +222,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       applySession(data.user, data.token);
       setGemBalance(0);
       setFreeReadingUsed(false);
+      setHasPendingPurchase(false);
     } catch (error: any) {
       console.error('Signup error:', error);
       throw error;
@@ -231,6 +236,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setToken(null);
     setGemBalance(0);
     setFreeReadingUsed(false);
+    setHasPendingPurchase(false);
     localStorage.removeItem('tarot_token');
   };
 
@@ -242,6 +248,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         loading,
         gemBalance,
         freeReadingUsed,
+        hasPendingPurchase,
         refreshGems,
         login,
         loginWithTelegramToken,
