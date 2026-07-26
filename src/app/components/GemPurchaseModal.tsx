@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
-import { Gem, Copy, CheckCircle2 } from 'lucide-react';
+import { Gem } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { API_URL } from '../config/api';
 import { toast } from 'sonner';
@@ -23,16 +23,6 @@ export function GemPurchaseModal({ open, onOpenChange }: GemPurchaseModalProps) 
   const { token, gemBalance, freeReadingUsed, refreshGems } = useAuth();
   const [selectedPack, setSelectedPack] = useState<string | null>(null);
   const [step, setStep] = useState<'select' | 'pay'>('select');
-  const [copied, setCopied] = useState(false);
-
-  const PAYNOW_NAME = 'Mystic Tarot Portal';
-  const PAYNOW_UEN = process.env.VITE_PAYNOW_UEN || 'YOUR_UEN_HERE';
-
-  const handleCopy = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
 
   const handleSelectPack = async (packId: string) => {
     setSelectedPack(packId);
@@ -114,26 +104,19 @@ export function GemPurchaseModal({ open, onOpenChange }: GemPurchaseModalProps) 
 
             <div className="space-y-3">
               <p className="font-semibold text-sm">Pay via PayNow:</p>
+
+              <div className="flex justify-center">
+                <img
+                  src="/paynow-qr.png"
+                  alt="PayNow QR code"
+                  className="w-48 h-48 rounded-lg border border-purple-200 object-contain"
+                />
+              </div>
+
               <ol className="text-sm space-y-2 text-muted-foreground list-decimal list-inside">
-                <li>Open your bank app and go to PayNow.</li>
-                <li>
-                  Pay <strong>SGD {pack.priceSGD}</strong> to{' '}
-                  <span className="font-medium text-foreground">{PAYNOW_NAME}</span>
-                  {PAYNOW_UEN !== 'YOUR_UEN_HERE' && (
-                    <>
-                      {' '}(UEN:{' '}
-                      <button
-                        onClick={() => handleCopy(PAYNOW_UEN)}
-                        className="inline-flex items-center gap-1 font-mono text-purple-700 hover:underline"
-                      >
-                        {PAYNOW_UEN}
-                        {copied ? <CheckCircle2 className="size-3 text-green-500" /> : <Copy className="size-3" />}
-                      </button>
-                      )
-                    </>
-                  )}
-                </li>
-                <li>Add your <strong>name or email</strong> in the payment reference.</li>
+                <li>Open your bank app and scan the QR code above.</li>
+                <li>Enter amount: <strong>SGD {pack.priceSGD}</strong></li>
+                <li>Add your <strong>name</strong> in the payment reference.</li>
                 <li>Screenshot the receipt and send it to the admin via Telegram.</li>
               </ol>
             </div>
