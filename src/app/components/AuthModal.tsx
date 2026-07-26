@@ -86,7 +86,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({ open, onOpenChange }) => {
         onOpenChange(false);
         resetTg();
       } else {
-        toast.error("Not confirmed yet — make sure you've pressed Start in the bot.");
+        toast.error(
+          "Not confirmed yet. Make sure you opened the bot and pressed Start. If you don't have Telegram, use the email login above.",
+          { duration: 6000 }
+        );
       }
     } catch (error: any) {
       toast.error(error.message || 'Could not verify. Please try again.');
@@ -145,42 +148,85 @@ export const AuthModal: React.FC<AuthModalProps> = ({ open, onOpenChange }) => {
           </div>
 
           {tgStep === 'idle' && (
-            <Button variant="outline" className="w-full" onClick={handleTelegramInit}>
-              <Send className="size-4 mr-2 text-blue-500" />
-              Continue with Telegram
-            </Button>
+            <div className="space-y-2">
+              <Button variant="outline" className="w-full" onClick={handleTelegramInit}>
+                <Send className="size-4 mr-2 text-blue-500" />
+                Continue with Telegram
+              </Button>
+              <p className="text-xs text-muted-foreground text-center">
+                Requires a free{' '}
+                <a href="https://telegram.org" target="_blank" rel="noreferrer" className="underline hover:text-foreground">
+                  Telegram
+                </a>{' '}
+                account. Don't have one? Use email login above.
+              </p>
+            </div>
           )}
 
           {tgStep === 'pending' && (
             <div className="space-y-3">
-              <p className="text-sm text-muted-foreground">
-                <span className="font-medium">Step 1</span> — Tap the button below to open the bot in Telegram.
-                <br />
-                <span className="font-medium">Step 2</span> — Press{' '}
-                <span className="font-mono bg-muted px-1 rounded">Start</span> in the chat.
-                <br />
-                <span className="font-medium">Step 3</span> — Come back here and tap <em>I've opened the bot</em>.
-              </p>
               {tgDeepLink ? (
-                <a href={tgDeepLink} target="_blank" rel="noreferrer" className="block">
-                  <Button className="w-full">
-                    <ExternalLink className="size-4 mr-2" />
-                    Open Telegram Bot
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    <span className="font-medium">Step 1</span> — Tap the button below to open the bot in Telegram.
+                    <br />
+                    <span className="font-medium">Step 2</span> — Press{' '}
+                    <span className="font-mono bg-muted px-1 rounded">Start</span> in the chat.
+                    <br />
+                    <span className="font-medium">Step 3</span> — Come back here and tap <em>I've opened the bot</em>.
+                  </p>
+                  <a href={tgDeepLink} target="_blank" rel="noreferrer" className="block">
+                    <Button className="w-full">
+                      <ExternalLink className="size-4 mr-2" />
+                      Open Telegram Bot
+                    </Button>
+                  </a>
+                  <Button variant="outline" className="w-full" onClick={handleTelegramVerify} disabled={tgChecking}>
+                    {tgChecking ? 'Checking…' : <><CheckCircle2 className="size-4 mr-2" />I've opened the bot — verify login</>}
                   </Button>
-                </a>
+                  <div className="rounded-md bg-muted/60 px-3 py-2 text-xs text-muted-foreground space-y-1">
+                    <p className="font-medium text-foreground">Don't have Telegram?</p>
+                    <p>
+                      Telegram is a free messaging app.{' '}
+                      <a href="https://telegram.org/dl" target="_blank" rel="noreferrer" className="underline hover:text-foreground">
+                        Download it here
+                      </a>
+                      , create an account, then come back and try again.
+                    </p>
+                    <p>
+                      Prefer not to use Telegram?{' '}
+                      <button
+                        type="button"
+                        onClick={resetTg}
+                        className="underline hover:text-foreground font-medium"
+                      >
+                        Sign up with email instead
+                      </button>
+                      .
+                    </p>
+                  </div>
+                </>
               ) : (
-                <p className="text-sm text-amber-600">Bot not configured — contact the portal administrator.</p>
+                <div className="rounded-md bg-amber-50 border border-amber-200 px-3 py-3 text-sm space-y-1">
+                  <p className="font-medium text-amber-800">Telegram login is not available right now.</p>
+                  <p className="text-amber-700">
+                    The bot hasn't been configured yet. Please{' '}
+                    <button
+                      type="button"
+                      onClick={resetTg}
+                      className="underline font-medium hover:text-amber-900"
+                    >
+                      sign up or log in with email
+                    </button>{' '}
+                    instead.
+                  </p>
+                </div>
               )}
-              <Button variant="outline" className="w-full" onClick={handleTelegramVerify} disabled={tgChecking}>
-                {tgChecking ? (
-                  'Checking…'
-                ) : (
-                  <><CheckCircle2 className="size-4 mr-2" />I've opened the bot — verify login</>
-                )}
-              </Button>
-              <button type="button" onClick={resetTg} className="text-xs text-muted-foreground hover:underline w-full text-center">
-                Cancel
-              </button>
+              {tgDeepLink && (
+                <button type="button" onClick={resetTg} className="text-xs text-muted-foreground hover:underline w-full text-center">
+                  Cancel
+                </button>
+              )}
             </div>
           )}
         </div>
