@@ -16,6 +16,7 @@ interface AuthContextType {
   freeReadingUsed: boolean;
   refreshGems: () => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
+  loginWithTelegramToken: (telegramToken: string) => Promise<void>;
   signup: (email: string, password: string, name?: string) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
@@ -176,6 +177,29 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  const loginWithTelegramToken = async (telegramToken: string) => {
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/auth/telegram-login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: telegramToken }),
+      });
+      if (!response.ok) {
+        const errorData = await parseApiResponse(response);
+        throw new Error(errorData.error || 'Telegram login failed');
+      }
+      const data = await parseApiResponse(response);
+      applySession(data.user, data.token);
+      await refreshGems();
+    } catch (error: any) {
+      console.error('Telegram login error:', error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const signup = async (email: string, password: string, name?: string) => {
     setLoading(true);
     try {
@@ -220,6 +244,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         freeReadingUsed,
         refreshGems,
         login,
+        loginWithTelegramToken,
         signup,
         logout,
         isAuthenticated: !!user,

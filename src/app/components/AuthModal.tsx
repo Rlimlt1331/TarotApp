@@ -5,12 +5,15 @@ import { Input } from '../components/ui/input';
 import { useAuth } from '../context/AuthContext';
 import { usePendingSubmission } from '../context/PendingSubmissionContext';
 import { toast } from 'sonner';
-import { Send } from 'lucide-react';
+import { Send, ExternalLink, CheckCircle2 } from 'lucide-react';
+import { API_URL } from '../config/api';
 
 interface AuthModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
+
+type TgLoginStep = 'idle' | 'pending' | 'checking';
 
 export const AuthModal: React.FC<AuthModalProps> = ({ open, onOpenChange }) => {
   const [mode, setMode] = useState<'login' | 'signup'>('login');
@@ -18,13 +21,22 @@ export const AuthModal: React.FC<AuthModalProps> = ({ open, onOpenChange }) => {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login, signup } = useAuth();
+
+  const [tgStep, setTgStep] = useState<TgLoginStep>('idle');
+  const [tgDeepLink, setTgDeepLink] = useState<string | null>(null);
+  const [tgRequestToken, setTgRequestToken] = useState<string | null>(null);
+  const [tgChecking, setTgChecking] = useState(false);
+
+  const { login, signup, loginWithTelegramToken } = useAuth();
   const { pendingSubmission } = usePendingSubmission();
+
+  const resetTg = () => { setTgStep('idle'); setTgDeepLink(null); setTgRequestToken(null); };
+
+  const handleClose = (o: boolean) => { if (!o) resetTg(); onOpenChange(o); };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-
     try {
       if (mode === 'login') {
         await login(email, password);
@@ -33,15 +45,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ open, onOpenChange }) => {
         await signup(email, password, name);
         toast.success('Account created successfully!');
       }
-
-      if (pendingSubmission) {
-        toast.success('Your reading request is ready to be submitted!');
-      }
-
+      if (pendingSubmission) toast.success('Your reading request is ready to be submitted!');
       onOpenChange(false);
-      setEmail('');
-      setPassword('');
-      setName('');
+      setEmail(''); setPassword(''); setName('');
     } catch (error: any) {
       toast.error(error.message || 'Authentication failed');
     } finally {
@@ -49,8 +55,48 @@ export const AuthModal: React.FC<AuthModalProps> = ({ open, onOpenChange }) => {
     }
   };
 
+  const handleTelegramInit = async () => {
+    try {
+      const res = await fetch(`${API_URL}/telegram/login-init`, { method: 'POST' });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setTgDeepLink(data.deepLink ?? null);
+      setTgRequestToken(data.requestToken);
+      setTgStep('pending');
+    } catch {
+      toast.error('Could not start Telegram login. Please try again.');
+    }
+  };
+
+  const handleTelegramVerify = async () => {
+    if (!tgRequestToken) return;
+    setTgChecking(true);
+    try {
+      const res = await fetch(`${API_URL}/telegram/login-status?requestToken=${tgRequestToken}`);
+      if (res.status === 410) {
+        toast.error('Login link expired. Please start again.');
+        resetTg();
+        return;
+      }
+      const data = await res.json();
+      if (data.ready && data.loginToken) {
+        await loginWithTelegramToken(data.loginToken);
+        toast.success('Logged in via Telegram!');
+        if (pendingSubmission) toast.success('Your reading request is ready to be submitted!');
+        onOpenChange(false);
+        resetTg();
+      } else {
+        toast.error("Not confirmed yet — make sure you've pressed Start in the bot.");
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'Could not verify. Please try again.');
+    } finally {
+      setTgChecking(false);
+    }
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{mode === 'login' ? 'Login' : 'Sign Up'}</DialogTitle>
@@ -60,88 +106,83 @@ export const AuthModal: React.FC<AuthModalProps> = ({ open, onOpenChange }) => {
           {mode === 'signup' && (
             <div>
               <label className="block text-sm font-medium mb-1">Name</label>
-              <Input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Your name"
-              />
+              <Input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" />
             </div>
           )}
-
           <div>
             <label className="block text-sm font-medium mb-1">Email</label>
-            <Input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="your@email.com"
-              required
-            />
-            {mode === 'signup' && (
-              <p className="mt-1 text-xs text-muted-foreground">Your email is used as your account ID.</p>
-            )}
+            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="your@email.com" required />
           </div>
-
           <div>
             <label className="block text-sm font-medium mb-1">Password</label>
-            <Input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              required
-            />
+            <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required />
           </div>
-
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? (mode === 'login' ? 'Logging in...' : 'Signing up...') : mode === 'login' ? 'Login' : 'Sign Up'}
+            {loading ? (mode === 'login' ? 'Logging in…' : 'Signing up…') : mode === 'login' ? 'Login' : 'Sign Up'}
           </Button>
         </form>
 
         <div className="text-center text-sm">
           {mode === 'login' ? (
-            <>
-              Don't have an account?{' '}
-              <button
-                type="button"
-                onClick={() => setMode('signup')}
-                className="text-primary hover:underline font-medium"
-              >
-                Sign up
-              </button>
-            </>
+            <>Don't have an account?{' '}<button type="button" onClick={() => setMode('signup')} className="text-primary hover:underline font-medium">Sign up</button></>
           ) : (
-            <>
-              Already have an account?{' '}
-              <button
-                type="button"
-                onClick={() => setMode('login')}
-                className="text-primary hover:underline font-medium"
-              >
-                Login
-              </button>
-            </>
+            <>Already have an account?{' '}<button type="button" onClick={() => setMode('login')} className="text-primary hover:underline font-medium">Login</button></>
           )}
         </div>
 
         <div className="relative">
-          <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t" />
-          </div>
+          <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
           <div className="relative flex justify-center text-xs uppercase">
             <span className="bg-background px-2 text-muted-foreground">Or</span>
           </div>
         </div>
 
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-center space-y-1">
-          <div className="flex items-center justify-center gap-1.5 font-medium text-blue-800">
-            <Send className="size-4" />
-            Login via Telegram
+        {/* ── Telegram login — same pattern as TelegramSettings in MyReadings ── */}
+        <div className="rounded-lg border p-4 space-y-3">
+          <div className="flex items-center gap-2 font-medium text-sm">
+            <Send className="size-4 text-blue-500" />
+            Login with Telegram
           </div>
-          <p className="text-blue-700 text-xs">
-            Send <strong>/start</strong> to the Telegram bot to get a magic login link — no password needed.
-          </p>
+
+          {tgStep === 'idle' && (
+            <Button variant="outline" className="w-full" onClick={handleTelegramInit}>
+              <Send className="size-4 mr-2 text-blue-500" />
+              Continue with Telegram
+            </Button>
+          )}
+
+          {tgStep === 'pending' && (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                <span className="font-medium">Step 1</span> — Tap the button below to open the bot in Telegram.
+                <br />
+                <span className="font-medium">Step 2</span> — Press{' '}
+                <span className="font-mono bg-muted px-1 rounded">Start</span> in the chat.
+                <br />
+                <span className="font-medium">Step 3</span> — Come back here and tap <em>I've opened the bot</em>.
+              </p>
+              {tgDeepLink ? (
+                <a href={tgDeepLink} target="_blank" rel="noreferrer" className="block">
+                  <Button className="w-full">
+                    <ExternalLink className="size-4 mr-2" />
+                    Open Telegram Bot
+                  </Button>
+                </a>
+              ) : (
+                <p className="text-sm text-amber-600">Bot not configured — contact the portal administrator.</p>
+              )}
+              <Button variant="outline" className="w-full" onClick={handleTelegramVerify} disabled={tgChecking}>
+                {tgChecking ? (
+                  'Checking…'
+                ) : (
+                  <><CheckCircle2 className="size-4 mr-2" />I've opened the bot — verify login</>
+                )}
+              </Button>
+              <button type="button" onClick={resetTg} className="text-xs text-muted-foreground hover:underline w-full text-center">
+                Cancel
+              </button>
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>
