@@ -12,12 +12,13 @@ import { usePendingSubmission } from '../context/PendingSubmissionContext';
 import { API_URL } from '../config/api';
 import { HOROSCOPES, SUGGESTED_QUESTIONS } from '../data/mockData';
 import { ReadingCategory, Gender } from '../types';
-import { Sparkles, Heart, Briefcase, Activity } from 'lucide-react';
+import { Sparkles, Heart, Briefcase, Activity, Gem } from 'lucide-react';
 import { toast } from 'sonner';
+import { GemPurchaseModal } from './GemPurchaseModal';
 
 export function RequesterPortal({ onShowAuthModal }: { onShowAuthModal: () => void }) {
   const { currentUser, addRequest } = useTarot();
-  const { user, token } = useAuth();
+  const { user, token, gemBalance, freeReadingUsed, refreshGems } = useAuth();
   const { pendingSubmission, setPendingSubmission, clearPendingSubmission } = usePendingSubmission();
   const [selectedCategory, setSelectedCategory] = useState<ReadingCategory>('relationships');
   const [customQuestion, setCustomQuestion] = useState('');
@@ -25,6 +26,7 @@ export function RequesterPortal({ onShowAuthModal }: { onShowAuthModal: () => vo
   const [horoscope, setHoroscope] = useState(currentUser?.horoscope || '');
   const [gender, setGender] = useState<Gender | ''>(currentUser?.gender || '');
   const [submitting, setSubmitting] = useState(false);
+  const [gemModalOpen, setGemModalOpen] = useState(false);
 
   useEffect(() => {
     if (user && token && pendingSubmission) {
@@ -45,7 +47,8 @@ export function RequesterPortal({ onShowAuthModal }: { onShowAuthModal: () => vo
   };
 
   const filteredQuestions = SUGGESTED_QUESTIONS.filter(q => q.category === selectedCategory);
-  const isFreeReading = (currentUser?.readingsCount ?? 0) === 0;
+  const isFreeReading = !freeReadingUsed;
+  const hasEnoughGems = gemBalance >= 20;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,25 +106,34 @@ export function RequesterPortal({ onShowAuthModal }: { onShowAuthModal: () => vo
         }),
       });
 
+      if (response.status === 402) {
+        const data = await response.json();
+        toast.error(`You need ${data.required} Gems but only have ${data.gemBalance}. Please top up your Gems.`);
+        setGemModalOpen(true);
+        return;
+      }
+
       if (!response.ok) {
         const message = await response.text();
         throw new Error(message || 'Failed to submit reading request');
       }
 
+      await refreshGems();
+
       addRequest({
         userId: currentUser.id,
-        userName: user.name || currentUser.name,
+        userName: user.name || currentUser.name || '',
         category: selectedCategory,
         question,
         userInfo: {
           horoscope: horoscope,
           gender: gender as Gender,
         },
-        isFreeReading: (currentUser?.readingsCount ?? 0) === 0,
+        isFreeReading,
       });
 
       clearPendingSubmission();
-      toast.success((currentUser?.readingsCount ?? 0) === 0 ? 'Your free reading request has been submitted!' : 'Reading request submitted!');
+      toast.success(isFreeReading ? 'Your free reading request has been submitted!' : 'Reading request submitted! (20 Gems deducted)');
       setCustomQuestion('');
       setSelectedQuestion('');
     } catch (error: any) {
@@ -142,11 +154,25 @@ export function RequesterPortal({ onShowAuthModal }: { onShowAuthModal: () => vo
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             Connect with experienced tarot readers for guidance on your life's journey
           </p>
-          {isFreeReading && (
+          {isFreeReading ? (
             <Badge className="text-lg px-6 py-2 free-badge text-white border-0">
               <Sparkles className="size-4 mr-2" />
-              Beta Version — Free Reading
+              First Reading Free
             </Badge>
+          ) : (
+            user && (
+              <div className="flex items-center gap-3">
+                <Badge variant="outline" className="text-base px-4 py-1.5 border-purple-300 text-purple-700">
+                  <Gem className="size-4 mr-2 text-purple-500" />
+                  {gemBalance} Gems
+                </Badge>
+                {!hasEnoughGems && (
+                  <Button size="sm" variant="outline" onClick={() => setGemModalOpen(true)} className="border-purple-400 text-purple-700 hover:bg-purple-50">
+                    Top Up Gems
+                  </Button>
+                )}
+              </div>
+            )
           )}
         </div>
 
@@ -303,12 +329,35 @@ export function RequesterPortal({ onShowAuthModal }: { onShowAuthModal: () => vo
             </CardContent>
           </Card>
 
-          <Button type="submit" size="lg" disabled={submitting} className="w-full text-lg py-6 bg-gradient-to-r from-purple-600 to-purple-900 hover:from-purple-700 hover:to-purple-950 shadow-lg hover:shadow-xl transition-all">
+          {user && !isFreeReading && !hasEnoughGems && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-center space-y-2">
+              <p className="text-sm font-medium text-amber-800">
+                You need 20 Gems to submit a reading request. Your current balance: {gemBalance} Gems.
+              </p>
+              <Button size="sm" onClick={() => setGemModalOpen(true)} className="bg-purple-600 hover:bg-purple-700 text-white">
+                <Gem className="size-4 mr-2" />
+                Buy Gems
+              </Button>
+            </div>
+          )}
+
+          <Button
+            type="submit"
+            size="lg"
+            disabled={submitting || (!!user && !isFreeReading && !hasEnoughGems)}
+            className="w-full text-lg py-6 bg-gradient-to-r from-purple-600 to-purple-900 hover:from-purple-700 hover:to-purple-950 shadow-lg hover:shadow-xl transition-all"
+          >
             <Sparkles className="size-5 mr-2" />
-            {submitting ? 'Submitting...' : 'Submit Reading Request'}
+            {submitting
+              ? 'Submitting...'
+              : isFreeReading
+                ? 'Submit Free Reading Request'
+                : `Submit Reading (20 Gems)`}
           </Button>
         </form>
       </div>
+
+      <GemPurchaseModal open={gemModalOpen} onOpenChange={setGemModalOpen} />
     </div>
   );
 }

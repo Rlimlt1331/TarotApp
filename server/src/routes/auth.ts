@@ -10,6 +10,10 @@ interface AuthRequest extends Request {
   userId?: number;
 }
 
+function signToken(userId: number, email: string | null): string {
+  return jwt.sign({ userId, email: email ?? '' }, JWT_SECRET, { expiresIn: '7d' });
+}
+
 // Signup
 router.post('/signup', async (req: AuthRequest, res: Response) => {
   try {
@@ -35,9 +39,7 @@ router.post('/signup', async (req: AuthRequest, res: Response) => {
       select: { id: true, email: true, name: true, role: true },
     });
 
-    const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, {
-      expiresIn: '7d',
-    });
+    const token = signToken(user.id, user.email);
 
     res.status(201).json({
       user,
@@ -64,28 +66,58 @@ router.post('/login', async (req: AuthRequest, res: Response) => {
       return res.status(401).json({ error: 'Account not found. Please check your email or sign up.' });
     }
 
+    if (!user.password) {
+      return res.status(401).json({ error: 'This account uses Telegram login. Please use /start in the Telegram bot to log in.' });
+    }
+
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
       return res.status(401).json({ error: 'Incorrect password. Please try again.' });
     }
 
-    const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, {
-      expiresIn: '7d',
-    });
+    const token = signToken(user.id, user.email);
 
     res.json({
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-      },
+      user: { id: user.id, email: user.email, name: user.name, role: user.role },
       token,
       message: 'Login successful',
     });
   } catch (error: any) {
     console.error('Login error:', error);
     res.status(500).json({ error: 'Login failed' });
+  }
+});
+
+// Telegram magic-link login — exchanges a short-lived token for a JWT
+router.post('/telegram-login', async (req: AuthRequest, res: Response) => {
+  try {
+    const { token } = req.body;
+    if (!token) {
+      return res.status(400).json({ error: 'Token is required' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { telegramLoginToken: token } });
+
+    if (!user || !user.telegramLoginTokenExpiry || user.telegramLoginTokenExpiry < new Date()) {
+      return res.status(401).json({ error: 'Login link has expired or is invalid. Send /start to the bot to get a new one.' });
+    }
+
+    // Consume the token immediately (one-time use)
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { telegramLoginToken: null, telegramLoginTokenExpiry: null },
+    });
+
+    const jwtToken = signToken(user.id, user.email);
+
+    res.json({
+      user: { id: user.id, email: user.email, name: user.name, role: user.role },
+      token: jwtToken,
+      message: 'Logged in via Telegram',
+    });
+  } catch (error: any) {
+    console.error('Telegram login error:', error);
+    res.status(500).json({ error: 'Telegram login failed' });
   }
 });
 

@@ -6,12 +6,10 @@ import { sendMessage } from '../services/telegramService.js';
 
 const router = Router();
 
+const LOGIN_TOKEN_TTL_MINUTES = 10;
+
 // ─── Telegram bot webhook (public — called by Telegram servers) ──────────────
-// Register this URL with Telegram via:
-//   POST https://api.telegram.org/bot{TOKEN}/setWebhook
-//   Body: { "url": "https://your-server/api/telegram/webhook" }
 router.post('/webhook', async (req: Request, res: Response) => {
-  // Always return 200 immediately so Telegram doesn't retry.
   res.json({ ok: true });
 
   try {
@@ -23,8 +21,10 @@ router.post('/webhook', async (req: Request, res: Response) => {
 
     const chatId: number = message.chat.id;
     const text: string = message.text.trim();
+    const senderName: string = message.from?.first_name || message.from?.username || 'there';
 
     if (text.startsWith('/start ')) {
+      // ── Deep link: linking an existing portal account to Telegram ──
       const linkToken = text.slice(7).trim();
       const user = await prisma.user.findUnique({ where: { telegramLinkToken: linkToken } });
 
@@ -40,22 +40,66 @@ router.post('/webhook', async (req: Request, res: Response) => {
 
       await sendMessage(
         chatId,
-        `✅ <b>Telegram connected!</b>\n\nHi ${user.name || user.email}! 🔮\n\nYou'll receive reading notifications here. Visit the portal to choose whether you'd like a notification or your full reading delivered directly.`
+        `✅ <b>Telegram connected!</b>\n\nHi ${user.name || user.email || senderName}! 🔮\n\nYou'll receive reading notifications here. Visit the portal to choose whether you'd like a notification or your full reading delivered directly.`
       );
     } else if (text === '/start') {
-      await sendMessage(
-        chatId,
-        '🔮 <b>Mystic Tarot Portal</b>\n\nTo link your account, click the <b>Link Telegram</b> button in the portal and follow the instructions there.'
-      );
+      // ── Plain /start: auto-register or send magic login link ──
+      const existingUser = await prisma.user.findFirst({
+        where: { telegramChatId: String(chatId) },
+      });
+
+      const portalUrl = process.env.FRONTEND_URL || '';
+      const loginToken = crypto.randomBytes(20).toString('hex');
+      const expiry = new Date(Date.now() + LOGIN_TOKEN_TTL_MINUTES * 60 * 1000);
+
+      if (existingUser) {
+        // User already registered — issue a magic login link
+        await prisma.user.update({
+          where: { id: existingUser.id },
+          data: { telegramLoginToken: loginToken, telegramLoginTokenExpiry: expiry },
+        });
+
+        const loginUrl = portalUrl ? `${portalUrl}?tg_login=${loginToken}` : null;
+        const lines = [
+          `👋 Welcome back, <b>${existingUser.name || senderName}</b>! 🔮`,
+          '',
+          loginUrl
+            ? `Tap the link below to log in (valid for ${LOGIN_TOKEN_TTL_MINUTES} min):\n🔗 <a href="${loginUrl}">Open Portal →</a>`
+            : 'Your account is linked. Open the portal and log in.',
+        ];
+        await sendMessage(chatId, lines.join('\n'));
+      } else {
+        // New user — create account automatically using Telegram identity
+        const newUser = await prisma.user.create({
+          data: {
+            name: senderName,
+            telegramChatId: String(chatId),
+            telegramLoginToken: loginToken,
+            telegramLoginTokenExpiry: expiry,
+          },
+        });
+
+        const loginUrl = portalUrl ? `${portalUrl}?tg_login=${loginToken}` : null;
+        const lines = [
+          `✨ <b>Welcome to Mystic Tarot Portal, ${newUser.name}!</b> 🔮`,
+          '',
+          'Your account has been created using your Telegram identity.',
+          '',
+          loginUrl
+            ? `Tap the link below to access the portal (valid for ${LOGIN_TOKEN_TTL_MINUTES} min):\n🔗 <a href="${loginUrl}">Open Portal →</a>`
+            : 'Open the portal and use the Telegram login option to get started.',
+        ];
+        await sendMessage(chatId, lines.join('\n'));
+      }
     } else {
-      await sendMessage(chatId, '👋 Use the portal to request and manage your tarot readings.');
+      await sendMessage(chatId, '👋 Send /start to get a login link for the portal.');
     }
   } catch (err) {
     console.error('Telegram webhook handler error:', err);
   }
 });
 
-// ─── Generate a one-time link token ─────────────────────────────────────────
+// ─── Generate a one-time link token (for linking existing account) ───────────
 router.post('/link-token', verifyToken, async (req: AuthRequest, res: Response) => {
   try {
     const token = crypto.randomBytes(16).toString('hex');

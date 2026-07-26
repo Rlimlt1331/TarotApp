@@ -3,9 +3,10 @@ import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { useTarot } from '../context/TarotContext';
 import { useAuth } from '../context/AuthContext';
-import { Sparkles, User, BookOpen, Eye, LogOut, LogIn } from 'lucide-react';
+import { Sparkles, User, BookOpen, Eye, LogOut, LogIn, Gem } from 'lucide-react';
 import { useState } from 'react';
 import { AuthModal } from './AuthModal';
+import { GemPurchaseModal } from './GemPurchaseModal';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,8 +19,9 @@ import {
 export function Navigation({ onEditProfile }: { onEditProfile: () => void }) {
   const location = useLocation();
   const { requests } = useTarot();
-  const { user, logout, isAdmin } = useAuth();
+  const { user, logout, isAdmin, gemBalance, freeReadingUsed } = useAuth();
   const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [gemModalOpen, setGemModalOpen] = useState(false);
 
   const pendingCount = requests.filter(r => r.status === 'pending').length;
 
@@ -72,6 +74,16 @@ export function Navigation({ onEditProfile }: { onEditProfile: () => void }) {
             <div className="flex items-center gap-3">
               {user ? (
                 <>
+                  {!isAdmin && (
+                    <button
+                      onClick={() => setGemModalOpen(true)}
+                      className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-purple-300 bg-purple-50 hover:bg-purple-100 transition-colors text-sm font-medium text-purple-700"
+                      title="Tarot Gems balance — click to top up"
+                    >
+                      <Gem className="size-3.5 text-purple-500" />
+                      {freeReadingUsed ? `${gemBalance} Gems` : 'Free reading available'}
+                    </button>
+                  )}
                   <Badge variant="outline" className="hidden sm:flex">
                     {user.name}
                   </Badge>
@@ -79,16 +91,22 @@ export function Navigation({ onEditProfile }: { onEditProfile: () => void }) {
                     <DropdownMenuTrigger asChild>
                       <Button variant="outline" size="sm" className="gap-2">
                         <User className="size-4" />
-                        <span className="hidden sm:inline">{user.email}</span>
+                        <span className="hidden sm:inline">{user.email ?? user.name ?? 'Account'}</span>
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-56">
                       <DropdownMenuLabel>My Account</DropdownMenuLabel>
                       <DropdownMenuSeparator />
                       {user.role === 'requester' && (
-                        <DropdownMenuItem onClick={onEditProfile}>
-                          Edit Profile
-                        </DropdownMenuItem>
+                        <>
+                          <DropdownMenuItem onClick={onEditProfile}>
+                            Edit Profile
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setGemModalOpen(true)}>
+                            <Gem className="size-4 mr-2 text-purple-500" />
+                            {freeReadingUsed ? `${gemBalance} Gems — Top Up` : 'Free reading available'}
+                          </DropdownMenuItem>
+                        </>
                       )}
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={logout} className="text-red-600">
@@ -139,6 +157,7 @@ export function Navigation({ onEditProfile }: { onEditProfile: () => void }) {
       </nav>
 
       <AuthModal open={authModalOpen} onOpenChange={setAuthModalOpen} />
+      <GemPurchaseModal open={gemModalOpen} onOpenChange={setGemModalOpen} />
     </>
   );
 }

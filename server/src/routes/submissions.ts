@@ -4,6 +4,7 @@ import { GeminiGenerationError, generateAdvancedReading, generateReadingAnalysis
 import { notifyReaderNewSubmission, notifyRequesterReadingReady } from '../services/telegramService.js';
 import { verifyAdmin } from '../middleware/verifyAdmin.js';
 import { verifyToken, AuthRequest } from '../middleware/verifyToken.js';
+import { GEM_COST_PER_READING, GEM_RATING_BONUS } from './gems.js';
 
 const router = Router();
 
@@ -11,31 +12,70 @@ const router = Router();
 router.post('/', verifyToken, async (req: AuthRequest, res: Response) => {
   try {
     const { question, category, horoscope, gender, country, occupation, additionalNotes } = req.body;
-    const userId = req.userId;
+    const userId = req.userId!;
 
     if (!question) {
       return res.status(400).json({ error: 'Question is required' });
     }
 
-    const submission = await prisma.submission.create({
-      data: {
-        userId: userId!,
-        question,
-        category: category || null,
-        horoscope: horoscope || null,
-        gender: gender || null,
-        country: country || null,
-        occupation: occupation || null,
-        additionalNotes: additionalNotes || null,
-      },
-      include: {
-        reading: { include: { detectedCards: true } },
-        user: { select: { id: true, email: true, name: true } },
-        feedbacks: true,
-      },
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { gemBalance: true, freeReadingUsed: true },
+    });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const isFreeReading = !user.freeReadingUsed;
+    const hasEnoughGems = user.gemBalance >= GEM_COST_PER_READING;
+
+    if (!isFreeReading && !hasEnoughGems) {
+      return res.status(402).json({
+        error: 'Insufficient Tarot Gems',
+        gemBalance: user.gemBalance,
+        required: GEM_COST_PER_READING,
+      });
+    }
+
+    // Deduct gems or mark free reading used — atomically with submission creation
+    const [submission] = await prisma.$transaction(async (tx) => {
+      if (isFreeReading) {
+        await tx.user.update({
+          where: { id: userId },
+          data: { freeReadingUsed: true },
+        });
+        await tx.gemTransaction.create({
+          data: { userId, type: 'free_reading', amount: 0 },
+        });
+      } else {
+        await tx.user.update({
+          where: { id: userId },
+          data: { gemBalance: { decrement: GEM_COST_PER_READING } },
+        });
+        await tx.gemTransaction.create({
+          data: { userId, type: 'reading_spend', amount: -GEM_COST_PER_READING },
+        });
+      }
+
+      const sub = await tx.submission.create({
+        data: {
+          userId,
+          question,
+          category: category || null,
+          horoscope: horoscope || null,
+          gender: gender || null,
+          country: country || null,
+          occupation: occupation || null,
+          additionalNotes: additionalNotes || null,
+          isFreeReading,
+        },
+        include: {
+          reading: { include: { detectedCards: true } },
+          user: { select: { id: true, email: true, name: true } },
+          feedbacks: true,
+        },
+      });
+      return [sub];
     });
 
-    // Fire-and-forget: alert the reader on Telegram. Never block the response.
     notifyReaderNewSubmission({
       id: submission.id,
       question: submission.question,
@@ -299,7 +339,7 @@ router.post('/:id/feedback', verifyToken, async (req: AuthRequest, res: Response
   try {
     const { id } = req.params;
     const { rating, comment } = req.body;
-    const userId = req.userId;
+    const userId = req.userId!;
 
     if (!rating || rating < 1 || rating > 5) {
       return res.status(400).json({ error: 'Rating must be between 1 and 5' });
@@ -310,13 +350,45 @@ router.post('/:id/feedback', verifyToken, async (req: AuthRequest, res: Response
       return res.status(404).json({ error: 'Submission not found' });
     }
 
-    const feedback = await prisma.feedback.upsert({
-      where: { submissionId_userId: { submissionId: parseInt(id), userId: userId! } },
-      update: { rating, comment },
-      create: { submissionId: parseInt(id), userId: userId!, rating, comment },
+    const existing = await prisma.feedback.findUnique({
+      where: { submissionId_userId: { submissionId: parseInt(id), userId } },
     });
 
-    res.json(feedback);
+    let gemBonusAwarded = false;
+
+    const feedback = await prisma.$transaction(async (tx) => {
+      const saved = await tx.feedback.upsert({
+        where: { submissionId_userId: { submissionId: parseInt(id), userId } },
+        update: { rating, comment },
+        create: { submissionId: parseInt(id), userId, rating, comment },
+      });
+
+      // Award bonus once per reading if rating >= 4 and not yet claimed
+      const eligibleForBonus = rating >= 4 && !existing?.ratingBonusClaimed && !saved.ratingBonusClaimed;
+      if (eligibleForBonus) {
+        await tx.feedback.update({
+          where: { id: saved.id },
+          data: { ratingBonusClaimed: true },
+        });
+        await tx.user.update({
+          where: { id: userId },
+          data: { gemBalance: { increment: GEM_RATING_BONUS } },
+        });
+        await tx.gemTransaction.create({
+          data: {
+            userId,
+            type: 'rating_bonus',
+            amount: GEM_RATING_BONUS,
+            referenceId: String(id),
+          },
+        });
+        gemBonusAwarded = true;
+      }
+
+      return tx.feedback.findUnique({ where: { id: saved.id } });
+    });
+
+    res.json({ feedback, gemBonusAwarded, bonusAmount: gemBonusAwarded ? GEM_RATING_BONUS : 0 });
   } catch (error: any) {
     console.error('Feedback error:', error);
     res.status(500).json({ error: 'Failed to save feedback' });

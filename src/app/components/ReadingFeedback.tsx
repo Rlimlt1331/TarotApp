@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
-import { Star } from 'lucide-react';
+import { Star, Gem } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
 import { API_URL } from '../config/api';
@@ -26,7 +26,7 @@ export const ReadingFeedback: React.FC<ReadingFeedbackProps> = ({ submissionId, 
   const [comment, setComment] = useState('');
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
-  const { token } = useAuth();
+  const { token, refreshGems } = useAuth();
 
   useEffect(() => {
     if (token) {
@@ -80,8 +80,18 @@ export const ReadingFeedback: React.FC<ReadingFeedbackProps> = ({ submissionId, 
 
       if (response.ok) {
         const data = await response.json();
-        setFeedback(data);
-        toast.success('Feedback saved successfully!');
+        setFeedback(data.feedback ?? data);
+        if (data.gemBonusAwarded) {
+          await refreshGems();
+          toast.success(
+            <div className="flex items-center gap-2">
+              <Gem className="size-4 text-purple-500" />
+              <span>Feedback saved! +{data.bonusAmount} Gems credited for your rating.</span>
+            </div>
+          );
+        } else {
+          toast.success('Feedback saved successfully!');
+        }
         onClose?.();
       } else {
         throw new Error('Failed to save feedback');

@@ -5,6 +5,7 @@ import { Input } from '../components/ui/input';
 import { useAuth } from '../context/AuthContext';
 import { usePendingSubmission } from '../context/PendingSubmissionContext';
 import { toast } from 'sonner';
+import { Send } from 'lucide-react';
 
 interface AuthModalProps {
   open: boolean;
@@ -122,6 +123,25 @@ export const AuthModal: React.FC<AuthModalProps> = ({ open, onOpenChange }) => {
               </button>
             </>
           )}
+        </div>
+
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-background px-2 text-muted-foreground">Or</span>
+          </div>
+        </div>
+
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-center space-y-1">
+          <div className="flex items-center justify-center gap-1.5 font-medium text-blue-800">
+            <Send className="size-4" />
+            Login via Telegram
+          </div>
+          <p className="text-blue-700 text-xs">
+            Send <strong>/start</strong> to the Telegram bot to get a magic login link — no password needed.
+          </p>
         </div>
       </DialogContent>
     </Dialog>

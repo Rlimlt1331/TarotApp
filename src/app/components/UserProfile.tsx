@@ -5,18 +5,48 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
+import { Badge } from './ui/badge';
 import { useTarot } from '../context/TarotContext';
+import { useAuth } from '../context/AuthContext';
 import { HOROSCOPES, COUNTRIES } from '../data/mockData';
 import { Gender } from '../types';
 import { toast } from 'sonner';
+import { Gem } from 'lucide-react';
+import { API_URL } from '../config/api';
+
+interface GemTransaction {
+  id: number;
+  type: 'purchase' | 'reading_spend' | 'rating_bonus' | 'free_reading';
+  amount: number;
+  referenceId: string | null;
+  createdAt: string;
+}
+
+const TX_LABELS: Record<string, string> = {
+  purchase: 'Gem Pack Purchase',
+  reading_spend: 'Reading',
+  rating_bonus: 'Rating Bonus',
+  free_reading: 'Free Reading',
+};
 
 export function UserProfile({ onComplete }: { onComplete: () => void }) {
   const { currentUser, setCurrentUser } = useTarot();
+  const { token, gemBalance, freeReadingUsed, refreshGems } = useAuth();
   const [name, setName] = useState(currentUser?.name || '');
   const [email, setEmail] = useState(currentUser?.email || '');
   const [horoscope, setHoroscope] = useState(currentUser?.horoscope || '');
   const [country, setCountry] = useState(currentUser?.country || '');
   const [gender, setGender] = useState<Gender>(currentUser?.gender || 'prefer-not-to-say');
+  const [transactions, setTransactions] = useState<GemTransaction[]>([]);
+
+  useEffect(() => {
+    if (!token) return;
+    refreshGems();
+    fetch(`${API_URL}/gems/balance`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.json())
+      .then((d) => setTransactions(d.transactions ?? []))
+      .catch(() => {});
+  }, [token]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -143,6 +173,40 @@ export function UserProfile({ onComplete }: { onComplete: () => void }) {
               )}
             </div>
           </form>
+        </CardContent>
+      </Card>
+
+      <Card className="w-full max-w-2xl tarot-card shadow-xl">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Gem className="size-5 text-purple-500" />
+            Tarot Gems
+          </CardTitle>
+          <CardDescription>
+            {freeReadingUsed ? `Balance: ${gemBalance} Gems` : 'Your first reading is free — no gems needed!'}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {transactions.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No gem transactions yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {transactions.map((tx) => (
+                <div key={tx.id} className="flex items-center justify-between py-2 border-b last:border-0">
+                  <div>
+                    <p className="text-sm font-medium">{TX_LABELS[tx.type] ?? tx.type}</p>
+                    <p className="text-xs text-muted-foreground">{new Date(tx.createdAt).toLocaleDateString()}</p>
+                  </div>
+                  <Badge
+                    variant="outline"
+                    className={tx.amount >= 0 ? 'text-green-700 border-green-300' : 'text-red-700 border-red-300'}
+                  >
+                    {tx.amount >= 0 ? '+' : ''}{tx.amount} Gems
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

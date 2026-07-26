@@ -9,19 +9,24 @@ datasource db {
 }
 
 model User {
-  id                 Int              @id @default(autoincrement())
-  email              String           @unique
-  password           String
-  name               String?
-  createdAt          DateTime         @default(now())
-  updatedAt          DateTime         @updatedAt
-  role               UserRole         @default(requester)
-  telegramChatId     String?
-  telegramNotifyMode String?
-  telegramLinkToken  String?          @unique
-  feedbacks          Feedback[]
-  submissions        Submission[]
-  preferences        UserPreferences?
+  id                       Int              @id @default(autoincrement())
+  email                    String?          @unique
+  password                 String?
+  name                     String?
+  createdAt                DateTime         @default(now())
+  updatedAt                DateTime         @updatedAt
+  role                     UserRole         @default(requester)
+  telegramChatId           String?
+  telegramNotifyMode       String?
+  telegramLinkToken        String?          @unique
+  telegramLoginToken       String?          @unique
+  telegramLoginTokenExpiry DateTime?
+  gemBalance               Int              @default(0)
+  freeReadingUsed          Boolean          @default(false)
+  feedbacks                Feedback[]
+  submissions              Submission[]
+  gemTransactions          GemTransaction[]
+  preferences              UserPreferences?
 
   @@map("users")
 }
@@ -38,6 +43,18 @@ model UserPreferences {
   @@map("user_preferences")
 }
 
+model GemTransaction {
+  id          Int                 @id @default(autoincrement())
+  userId      Int
+  type        GemTransactionType
+  amount      Int
+  referenceId String?
+  createdAt   DateTime            @default(now())
+  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("gem_transactions")
+}
+
 model Submission {
   id              Int       @id @default(autoincrement())
   userId          Int
@@ -48,6 +65,7 @@ model Submission {
   country         String?
   occupation      String?
   additionalNotes String?
+  isFreeReading   Boolean   @default(false)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -84,15 +102,16 @@ model Card {
 }
 
 model Feedback {
-  id           Int        @id @default(autoincrement())
-  submissionId Int
-  userId       Int
-  rating       Int
-  comment      String?
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
-  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                Int        @id @default(autoincrement())
+  submissionId      Int
+  userId            Int
+  rating            Int
+  comment           String?
+  ratingBonusClaimed Boolean   @default(false)
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  submission        Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  user              User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([submissionId, userId])
   @@map("feedbacks")
@@ -101,4 +120,11 @@ model Feedback {
 enum UserRole {
   requester
   admin
+}
+
+enum GemTransactionType {
+  purchase
+  reading_spend
+  rating_bonus
+  free_reading
 }

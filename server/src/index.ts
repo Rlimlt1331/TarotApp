@@ -9,6 +9,7 @@ import readingsRoutes from './routes/readings.js';
 import submissionsRoutes from './routes/submissions.js';
 import telegramRoutes from './routes/telegram.js';
 import usersRoutes from './routes/users.js';
+import gemsRoutes from './routes/gems.js';
 
 dotenv.config();
 
@@ -58,6 +59,7 @@ app.use('/api/readings', readingsRoutes);
 app.use('/api/submissions', submissionsRoutes);
 app.use('/api/telegram', telegramRoutes);
 app.use('/api/users', usersRoutes);
+app.use('/api/gems', gemsRoutes);
 
 // Health check
 app.get('/api/health', (req: Request, res: Response) => {

@@ -32,7 +32,7 @@ export async function notifyReaderNewSubmission(submission: {
   question: string;
   category?: string | null;
   horoscope?: string | null;
-  user: { name?: string | null; email: string };
+  user: { name?: string | null; email: string | null };
 }): Promise<void> {
   const chatId = process.env.TELEGRAM_READER_CHAT_ID;
   if (!chatId) return;
@@ -41,7 +41,7 @@ export async function notifyReaderNewSubmission(submission: {
   const lines: string[] = [
     '🔮 <b>New Reading Request</b>',
     '',
-    `👤 <b>From:</b> ${submission.user.name || 'Anonymous'} (${submission.user.email})`,
+    `👤 <b>From:</b> ${submission.user.name || 'Anonymous'}${submission.user.email ? ` (${submission.user.email})` : ''}`,
   ];
   if (submission.category) lines.push(`🌟 <b>Category:</b> ${submission.category}`);
   if (submission.horoscope) lines.push(`♈ <b>Horoscope:</b> ${submission.horoscope}`);
