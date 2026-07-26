@@ -135,6 +135,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 setHasPendingPurchase(gemsData.hasPendingPurchase ?? false);
               }
             } catch { /* non-fatal */ }
+
+            // If the user had a pending form submission, send them back to the
+            // request page so it can be restored. The magic link always opens
+            // the root URL, so without this redirect the RequesterPortal is
+            // never mounted and the form data stays stuck in sessionStorage.
+            const hasPendingForm = !!sessionStorage.getItem('tarot_pending_submission');
+            if (hasPendingForm && window.location.pathname !== '/request') {
+              window.location.replace('/request');
+            }
           } else {
             console.warn('Telegram login token invalid or expired');
             const storedToken = localStorage.getItem('tarot_token');
