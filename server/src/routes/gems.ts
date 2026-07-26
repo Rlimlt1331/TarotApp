@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { prisma } from '../index.js';
 import { verifyToken, AuthRequest } from '../middleware/verifyToken.js';
+import { notifyReaderNewSubmission } from '../services/telegramService.js';
 
 const router = Router();
 
@@ -90,6 +91,14 @@ router.get('/admin/pending', verifyToken, async (req: AuthRequest, res: Response
       orderBy: { createdAt: 'desc' },
     });
 
+    // Also fetch pending-payment submission counts per user
+    const pendingSubmissionCounts = await prisma.submission.groupBy({
+      by: ['userId'],
+      where: { userId: { in: pending.map((t) => t.userId) }, pendingPayment: true },
+      _count: { id: true },
+    });
+    const pendingSubMap = Object.fromEntries(pendingSubmissionCounts.map((r) => [r.userId, r._count.id]));
+
     res.json({ pending: pending.map((t) => ({
       id: t.id,
       userId: t.userId,
@@ -99,6 +108,7 @@ router.get('/admin/pending', verifyToken, async (req: AuthRequest, res: Response
       gems: t.amount,
       pack: GEM_PACKS.find((p) => p.id === t.referenceId) || null,
       requestedAt: t.createdAt,
+      pendingSubmissions: pendingSubMap[t.userId] ?? 0,
     })) });
   } catch (err) {
     console.error('Pending purchases error:', err);
@@ -121,28 +131,57 @@ router.post('/admin/credit', verifyToken, async (req: AuthRequest, res: Response
       return res.status(400).json({ error: 'userId and valid packId are required' });
     }
 
-    const [updatedUser, transaction] = await prisma.$transaction([
-      prisma.user.update({
+    // Find any pending-payment submissions for this user so we can activate them
+    const pendingSubmissions = await prisma.submission.findMany({
+      where: { userId, pendingPayment: true },
+      include: { user: { select: { id: true, name: true, email: true } } },
+    });
+    const gemCostForPending = pendingSubmissions.length * GEM_COST_PER_READING;
+    const netGems = pack.totalGems - gemCostForPending;
+
+    const [updatedUser] = await prisma.$transaction(async (tx) => {
+      // Credit the full pack amount first
+      const user = await tx.user.update({
         where: { id: userId },
         data: { gemBalance: { increment: pack.totalGems } },
         select: { id: true, gemBalance: true },
-      }),
-      prisma.gemTransaction.create({
-        data: {
-          userId,
-          type: 'purchase',
-          amount: pack.totalGems,
-          referenceId: note || `paynow_${packId}`,
-        },
-      }),
-    ]);
+      });
+      // Record the purchase
+      await tx.gemTransaction.create({
+        data: { userId, type: 'purchase', amount: pack.totalGems, referenceId: note || `paynow_${packId}` },
+      });
+      // Activate pending-payment submissions: deduct gems + clear flag
+      for (const sub of pendingSubmissions) {
+        await tx.submission.update({ where: { id: sub.id }, data: { pendingPayment: false } });
+        await tx.gemTransaction.create({ data: { userId, type: 'reading_spend', amount: -GEM_COST_PER_READING } });
+        await tx.user.update({ where: { id: userId }, data: { gemBalance: { decrement: GEM_COST_PER_READING } } });
+      }
+      return [user];
+    });
 
     // Remove the pending_purchase record now that it's been fulfilled
     if (pendingId) {
       await prisma.gemTransaction.delete({ where: { id: pendingId } }).catch(() => {});
     }
 
-    res.json({ message: `Credited ${pack.totalGems} gems`, user: updatedUser, transaction });
+    // Notify reader about newly activated submissions
+    for (const sub of pendingSubmissions) {
+      notifyReaderNewSubmission({
+        id: sub.id,
+        question: sub.question,
+        category: sub.category,
+        horoscope: sub.horoscope,
+        user: { name: sub.user.name, email: sub.user.email },
+      }).catch((err) => console.error('Telegram reader alert (on gem credit) failed:', err));
+    }
+
+    const activatedCount = pendingSubmissions.length;
+    res.json({
+      message: `Credited ${pack.totalGems} gems${activatedCount ? `, activated ${activatedCount} pending reading${activatedCount > 1 ? 's' : ''}` : ''}`,
+      netGemsAdded: netGems,
+      activatedSubmissions: activatedCount,
+      user: updatedUser,
+    });
   } catch (err) {
     console.error('Gem credit error:', err);
     res.status(500).json({ error: 'Failed to credit gems' });

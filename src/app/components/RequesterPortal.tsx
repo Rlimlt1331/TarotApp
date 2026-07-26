@@ -106,10 +106,9 @@ export function RequesterPortal({ onShowAuthModal }: { onShowAuthModal: () => vo
         }),
       });
 
-      if (response.status === 402) {
+      if (response.status === 409) {
         const data = await response.json();
-        toast.error(`You need ${data.required} Gems but only have ${data.gemBalance}. Please top up your Gems.`);
-        setGemModalOpen(true);
+        toast.error(data.error || 'You already have a reading pending payment confirmation.');
         return;
       }
 
@@ -118,6 +117,7 @@ export function RequesterPortal({ onShowAuthModal }: { onShowAuthModal: () => vo
         throw new Error(message || 'Failed to submit reading request');
       }
 
+      const data = await response.json();
       await refreshGems();
 
       addRequest({
@@ -133,7 +133,13 @@ export function RequesterPortal({ onShowAuthModal }: { onShowAuthModal: () => vo
       });
 
       clearPendingSubmission();
-      toast.success(isFreeReading ? 'Your free reading request has been submitted!' : 'Reading request submitted! (20 Gems deducted)');
+
+      if (data.pendingPayment) {
+        toast.info('Your reading has been queued! Please complete payment to activate it.');
+        setGemModalOpen(true);
+      } else {
+        toast.success(isFreeReading ? 'Your free reading request has been submitted!' : 'Reading request submitted! (20 Gems deducted)');
+      }
       setCustomQuestion('');
       setSelectedQuestion('');
     } catch (error: any) {
@@ -336,18 +342,17 @@ export function RequesterPortal({ onShowAuthModal }: { onShowAuthModal: () => vo
                   Payment pending verification
                 </p>
                 <p className="text-xs text-blue-700">
-                  Your payment is being reviewed. Gems will be credited to your account within 24 hours, after which you can submit your reading.
+                  Your payment is being reviewed. Gems will be credited and your reading activated within 24 hours.
                 </p>
               </div>
             ) : (
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-center space-y-2">
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-center space-y-1">
                 <p className="text-sm font-medium text-amber-800">
-                  You need 20 Gems to submit a reading request. Your current balance: {gemBalance} Gems.
+                  You need 20 Gems — you have {gemBalance}.
                 </p>
-                <Button size="sm" onClick={() => setGemModalOpen(true)} className="bg-purple-600 hover:bg-purple-700 text-white">
-                  <Gem className="size-4 mr-2" />
-                  Buy Gems
-                </Button>
+                <p className="text-xs text-amber-700">
+                  Click Submit to queue your reading and pay via PayNow. Your reading will be activated once payment is verified.
+                </p>
               </div>
             )
           )}
@@ -355,7 +360,7 @@ export function RequesterPortal({ onShowAuthModal }: { onShowAuthModal: () => vo
           <Button
             type="submit"
             size="lg"
-            disabled={submitting || (!!user && !isFreeReading && !hasEnoughGems)}
+            disabled={submitting || (!!user && !isFreeReading && hasPendingPurchase)}
             className="w-full text-lg py-6 bg-gradient-to-r from-purple-600 to-purple-900 hover:from-purple-700 hover:to-purple-950 shadow-lg hover:shadow-xl transition-all"
           >
             <Sparkles className="size-5 mr-2" />
@@ -363,7 +368,9 @@ export function RequesterPortal({ onShowAuthModal }: { onShowAuthModal: () => vo
               ? 'Submitting...'
               : isFreeReading
                 ? 'Submit Free Reading Request'
-                : `Submit Reading (20 Gems)`}
+                : hasEnoughGems
+                  ? 'Submit Reading (20 Gems)'
+                  : 'Queue Reading & Pay via PayNow'}
           </Button>
         </form>
       </div>

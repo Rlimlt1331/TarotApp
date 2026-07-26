@@ -20,9 +20,10 @@ interface PendingPurchase {
   gems: number;
   pack: { id: string; priceSGD: number; totalGems: number } | null;
   requestedAt: string;
+  pendingSubmissions: number;
 }
 
-type QueueStatus = 'pending' | 'processing' | 'completed';
+type QueueStatus = 'pending' | 'processing' | 'completed' | 'pending_payment';
 
 interface DetectedCardRecord {
   id: number;
@@ -51,6 +52,7 @@ interface Submission {
   country: string | null;
   occupation: string | null;
   additionalNotes: string | null;
+  pendingPayment: boolean;
   createdAt: string;
   updatedAt: string;
   user: {
@@ -93,6 +95,14 @@ const statusStyles: Record<QueueStatus, string> = {
   pending: 'bg-amber-500/10 text-amber-700 border-amber-200',
   processing: 'bg-blue-500/10 text-blue-700 border-blue-200',
   completed: 'bg-green-500/10 text-green-700 border-green-200',
+  pending_payment: 'bg-purple-500/10 text-purple-700 border-purple-200',
+};
+
+const statusLabels: Record<QueueStatus, string> = {
+  pending: 'pending',
+  processing: 'processing',
+  completed: 'completed',
+  pending_payment: 'pending payment',
 };
 
 export const AdminDashboard: React.FC = () => {
@@ -136,6 +146,7 @@ export const AdminDashboard: React.FC = () => {
     if (statuses[submissionId] === 'processing') return 'processing';
     const submission = submissions.find(s => s.id === submissionId);
     if (submission?.reading) return 'completed';
+    if (submission?.pendingPayment) return 'pending_payment';
     return 'pending';
   };
 
@@ -211,7 +222,7 @@ export const AdminDashboard: React.FC = () => {
         counts[getStatus(submission.id)] += 1;
         return counts;
       },
-      { pending: 0, processing: 0, completed: 0 } as Record<QueueStatus, number>
+      { pending: 0, processing: 0, completed: 0, pending_payment: 0 } as Record<QueueStatus, number>
     );
   }, [submissions, statuses]);
 
@@ -490,7 +501,7 @@ export const AdminDashboard: React.FC = () => {
                     <CardTitle>{selectedSubmission.user.name}</CardTitle>
                     <CardDescription>{selectedSubmission.user.email}</CardDescription>
                   </div>
-                  <Badge className={statusStyles[status]}>{status}</Badge>
+                  <Badge className={statusStyles[status]}>{statusLabels[status]}</Badge>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4 text-sm">
@@ -813,11 +824,19 @@ export const AdminDashboard: React.FC = () => {
                         <span className="font-medium">{p.userName || '(no name)'}</span>
                         {p.userEmail && <span className="text-sm text-muted-foreground">{p.userEmail}</span>}
                       </div>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
                         <Gem className="size-3.5 text-purple-500" />
                         <span>
-                          {p.pack ? `${p.pack.id.replace('pack_', '$')} SGD — ${p.gems} Gems` : `${p.gems} Gems`}
+                          {p.pack ? `SGD ${p.pack.priceSGD} — ${p.gems} Gems` : `${p.gems} Gems`}
                         </span>
+                        {p.pendingSubmissions > 0 && (
+                          <>
+                            <span>·</span>
+                            <Badge className="bg-purple-100 text-purple-700 border-purple-200 text-xs">
+                              {p.pendingSubmissions} reading{p.pendingSubmissions > 1 ? 's' : ''} queued
+                            </Badge>
+                          </>
+                        )}
                         <span>·</span>
                         <Calendar className="size-3.5" />
                         <span>{format(new Date(p.requestedAt), 'MMM dd, yyyy HH:mm')}</span>
@@ -858,10 +877,10 @@ export const AdminDashboard: React.FC = () => {
       </div>
 
       <div className="grid gap-4 md:grid-cols-3 mb-6">
-        {(['pending', 'processing', 'completed'] as QueueStatus[]).map((status) => (
+        {(['pending_payment', 'pending', 'processing', 'completed'] as QueueStatus[]).map((status) => (
           <Card key={status}>
             <CardHeader className="pb-2">
-              <CardTitle className="capitalize text-sm">{status}</CardTitle>
+              <CardTitle className="capitalize text-sm">{statusLabels[status]}</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-4xl font-bold">{queueCounts[status]}</p>
@@ -899,7 +918,7 @@ export const AdminDashboard: React.FC = () => {
                         <span>{format(new Date(submission.createdAt), 'MMM dd, yyyy HH:mm')}</span>
                       </CardDescription>
                     </div>
-                    <Badge className={statusStyles[status]}>{status}</Badge>
+                    <Badge className={statusStyles[status]}>{statusLabels[status]}</Badge>
                   </div>
                 </CardHeader>
                 <CardContent>

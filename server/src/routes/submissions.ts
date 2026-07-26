@@ -26,33 +26,30 @@ router.post('/', verifyToken, async (req: AuthRequest, res: Response) => {
 
     const isFreeReading = !user.freeReadingUsed;
     const hasEnoughGems = user.gemBalance >= GEM_COST_PER_READING;
+    const pendingPayment = !isFreeReading && !hasEnoughGems;
 
-    if (!isFreeReading && !hasEnoughGems) {
-      return res.status(402).json({
-        error: 'Insufficient Tarot Gems',
-        gemBalance: user.gemBalance,
-        required: GEM_COST_PER_READING,
+    if (pendingPayment) {
+      // Guard: only one pending-payment submission allowed at a time
+      const existing = await prisma.submission.findFirst({
+        where: { userId, pendingPayment: true },
       });
+      if (existing) {
+        return res.status(409).json({
+          error: 'You already have a reading queued pending payment. Please complete that payment first.',
+          submissionId: existing.id,
+        });
+      }
     }
 
-    // Deduct gems or mark free reading used — atomically with submission creation
+    // Deduct gems or mark free reading used — atomically with submission creation.
+    // For pendingPayment submissions gems are NOT deducted yet; that happens when admin credits.
     const [submission] = await prisma.$transaction(async (tx) => {
       if (isFreeReading) {
-        await tx.user.update({
-          where: { id: userId },
-          data: { freeReadingUsed: true },
-        });
-        await tx.gemTransaction.create({
-          data: { userId, type: 'free_reading', amount: 0 },
-        });
-      } else {
-        await tx.user.update({
-          where: { id: userId },
-          data: { gemBalance: { decrement: GEM_COST_PER_READING } },
-        });
-        await tx.gemTransaction.create({
-          data: { userId, type: 'reading_spend', amount: -GEM_COST_PER_READING },
-        });
+        await tx.user.update({ where: { id: userId }, data: { freeReadingUsed: true } });
+        await tx.gemTransaction.create({ data: { userId, type: 'free_reading', amount: 0 } });
+      } else if (!pendingPayment) {
+        await tx.user.update({ where: { id: userId }, data: { gemBalance: { decrement: GEM_COST_PER_READING } } });
+        await tx.gemTransaction.create({ data: { userId, type: 'reading_spend', amount: -GEM_COST_PER_READING } });
       }
 
       const sub = await tx.submission.create({
@@ -66,6 +63,7 @@ router.post('/', verifyToken, async (req: AuthRequest, res: Response) => {
           occupation: occupation || null,
           additionalNotes: additionalNotes || null,
           isFreeReading,
+          pendingPayment,
         },
         include: {
           reading: { include: { detectedCards: true } },
@@ -76,13 +74,16 @@ router.post('/', verifyToken, async (req: AuthRequest, res: Response) => {
       return [sub];
     });
 
-    notifyReaderNewSubmission({
-      id: submission.id,
-      question: submission.question,
-      category: submission.category,
-      horoscope: submission.horoscope,
-      user: { name: submission.user.name, email: submission.user.email },
-    }).catch((err) => console.error('Telegram reader alert failed:', err));
+    // Only notify the reader once payment is confirmed (not for pending-payment submissions)
+    if (!pendingPayment) {
+      notifyReaderNewSubmission({
+        id: submission.id,
+        question: submission.question,
+        category: submission.category,
+        horoscope: submission.horoscope,
+        user: { name: submission.user.name, email: submission.user.email },
+      }).catch((err) => console.error('Telegram reader alert failed:', err));
+    }
 
     res.status(201).json(submission);
   } catch (error: any) {

@@ -223,6 +223,7 @@ interface Submission {
   country: string | null;
   occupation: string | null;
   additionalNotes: string | null;
+  pendingPayment: boolean;
   createdAt: string;
   reading: AgentReading | null;
 }
@@ -257,7 +258,8 @@ export function MyReadings() {
   };
 
   const completedCount = submissions.filter(s => s.reading !== null).length;
-  const pendingCount = submissions.filter(s => s.reading === null).length;
+  const pendingCount = submissions.filter(s => s.reading === null && !s.pendingPayment).length;
+  const pendingPaymentCount = submissions.filter(s => s.pendingPayment).length;
 
   if (loading) {
     return (
@@ -280,7 +282,7 @@ export function MyReadings() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className={`grid grid-cols-1 gap-4 ${pendingPaymentCount > 0 ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
           <Card className="tarot-card bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950 dark:to-purple-900 border-purple-200">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm text-purple-900 dark:text-purple-100">Total Requests</CardTitle>
@@ -305,6 +307,16 @@ export function MyReadings() {
               <div className="text-4xl font-bold text-amber-600">{pendingCount}</div>
             </CardContent>
           </Card>
+          {pendingPaymentCount > 0 && (
+            <Card className="tarot-card bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950 dark:to-purple-900 border-purple-300">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm text-purple-900 dark:text-purple-100">Pending Payment</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-4xl font-bold text-purple-600">{pendingPaymentCount}</div>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {token && <TelegramSettings token={token} />}
@@ -321,6 +333,7 @@ export function MyReadings() {
             submissions.map((submission) => {
               const category = submission.category || 'general';
               const isCompleted = submission.reading !== null;
+              const isPendingPayment = submission.pendingPayment;
 
               return (
                 <Card key={submission.id} className="tarot-card">
@@ -339,7 +352,16 @@ export function MyReadings() {
                           <Badge className={categoryColors[category] || categoryColors.general}>
                             {category}
                           </Badge>
-                          {!isCompleted && (
+                          {isPendingPayment && (
+                            <Badge className="bg-purple-500/10 text-purple-700 border-purple-200 flex items-center gap-1.5">
+                              <span className="relative flex size-2">
+                                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-purple-400 opacity-75" />
+                                <span className="relative inline-flex size-2 rounded-full bg-purple-500" />
+                              </span>
+                              Pending payment confirmation
+                            </Badge>
+                          )}
+                          {!isCompleted && !isPendingPayment && (
                             <Badge className="bg-amber-500/10 text-amber-700 border-amber-200 flex items-center gap-1.5">
                               <span className="relative flex size-2">
                                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
