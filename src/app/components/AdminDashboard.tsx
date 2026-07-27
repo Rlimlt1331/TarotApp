@@ -786,167 +786,177 @@ export const AdminDashboard: React.FC = () => {
     );
   }
 
-  if (view === 'gems') {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold mb-1">Gem Credits</h1>
-            <p className="text-gray-600">Verify PayNow payments and credit gems to requesters.</p>
-          </div>
-          <Button variant="outline" onClick={() => setView('queue')}>
-            <ArrowLeft className="size-4 mr-2" />
-            Back to Queue
-          </Button>
-        </div>
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold mb-1">Reader Portal</h1>
+        <p className="text-muted-foreground">Review requester submissions and process card spread readings.</p>
+      </div>
 
-        {gemsLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary" />
-          </div>
-        ) : pendingPurchases.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <Gem className="size-10 text-muted-foreground mx-auto mb-3" />
-              <p className="text-gray-500">No pending payment requests</p>
-              <p className="text-xs text-muted-foreground mt-1">Requests appear here when a user selects a gem pack and initiates payment.</p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-3">
-            {pendingPurchases.map((p) => (
-              <Card key={p.id}>
-                <CardContent className="py-4">
-                  <div className="flex items-center justify-between gap-4 flex-wrap">
-                    <div className="space-y-0.5">
-                      <div className="flex items-center gap-2">
-                        <User className="size-4 text-muted-foreground" />
-                        <span className="font-medium">{p.userName || '(no name)'}</span>
-                        {p.userEmail && <span className="text-sm text-muted-foreground">{p.userEmail}</span>}
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
-                        <Gem className="size-3.5 text-purple-500" />
-                        <span>
-                          {p.pack ? `SGD ${p.pack.priceSGD} — ${p.gems} Gems` : `${p.gems} Gems`}
-                        </span>
-                        {p.pendingSubmissions > 0 && (
-                          <>
-                            <span>·</span>
-                            <Badge className="bg-purple-100 text-purple-700 border-purple-200 text-xs">
-                              {p.pendingSubmissions} reading{p.pendingSubmissions > 1 ? 's' : ''} queued
-                            </Badge>
-                          </>
-                        )}
-                        <span>·</span>
-                        <Calendar className="size-3.5" />
-                        <span>{format(new Date(p.requestedAt), 'MMM dd, yyyy HH:mm')}</span>
-                      </div>
-                    </div>
-                    <Button
-                      onClick={() => creditGems(p)}
-                      disabled={crediting === p.id}
-                      className="bg-purple-600 hover:bg-purple-700 text-white shrink-0"
-                    >
-                      <CheckCircle2 className="size-4 mr-2" />
-                      {crediting === p.id ? 'Crediting…' : `Credit ${p.gems} Gems`}
-                    </Button>
-                  </div>
+      {/* Tab bar */}
+      <div className="border-b border-border mb-6">
+        <div className="flex">
+          <button
+            onClick={() => setView('queue')}
+            className={`px-5 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              view === 'queue'
+                ? 'border-primary text-foreground'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            Reading Queue
+          </button>
+          <button
+            onClick={() => setView('gems')}
+            className={`flex items-center gap-2 px-5 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              view === 'gems'
+                ? 'border-primary text-foreground'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            Payment Verification
+            {pendingPurchases.length > 0 && (
+              <Badge className="bg-purple-600 text-white border-0 text-xs py-0 h-5">{pendingPurchases.length}</Badge>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Reading Queue tab */}
+      {view === 'queue' && (
+        <>
+          <div className="grid gap-4 md:grid-cols-4 mb-6">
+            {(['pending_payment', 'pending', 'processing', 'completed'] as QueueStatus[]).map((status) => (
+              <Card key={status}>
+                <CardHeader className="pb-2">
+                  <CardTitle className="capitalize text-sm">{statusLabels[status]}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-4xl font-bold">{queueCounts[status]}</p>
                 </CardContent>
               </Card>
             ))}
           </div>
-        )}
-      </div>
-    );
-  }
 
-  return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-8 flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold mb-2">Reader Portal</h1>
-          <p className="text-gray-600">Review requester submissions and process card spread readings.</p>
-        </div>
-        <Button variant="outline" onClick={() => setView('gems')} className="shrink-0">
-          <Gem className="size-4 mr-2 text-purple-500" />
-          Gem Credits
-          {pendingPurchases.length > 0 && (
-            <Badge className="ml-2 bg-purple-600 text-white border-0 text-xs">{pendingPurchases.length}</Badge>
+          {submissions.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <p className="text-muted-foreground">No submissions yet</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4">
+              {submissions.map((submission) => {
+                const status = getStatus(submission.id);
+                return (
+                  <Card
+                    key={submission.id}
+                    className="cursor-pointer hover:shadow-lg transition-shadow"
+                    onClick={() => selectSubmission(submission)}
+                  >
+                    <CardHeader>
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <CardTitle className="flex items-center gap-2">
+                            <User className="size-5" />
+                            {submission.question}
+                          </CardTitle>
+                          <CardDescription className="flex flex-wrap items-center gap-4 mt-2">
+                            <span>{submission.user.name}</span>
+                            <span>{format(new Date(submission.createdAt), 'MMM dd, yyyy HH:mm')}</span>
+                          </CardDescription>
+                        </div>
+                        <Badge className={statusStyles[status]}>{statusLabels[status]}</Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex flex-wrap gap-2">
+                        {submission.category && (
+                          <Badge variant="outline">Category: {submission.category}</Badge>
+                        )}
+                        {submission.horoscope && (
+                          <Badge variant="outline">Horoscope: {submission.horoscope}</Badge>
+                        )}
+                        {submission.country && (
+                          <Badge variant="outline">Country: {submission.country}</Badge>
+                        )}
+                        {submission.gender && (
+                          <Badge variant="outline">Gender: {submission.gender}</Badge>
+                        )}
+                        {status === 'completed' && (
+                          <Badge variant="secondary" className="gap-1">
+                            <CheckCircle2 className="size-3" />
+                            Reading saved
+                          </Badge>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
           )}
-        </Button>
-      </div>
+        </>
+      )}
 
-      <div className="grid gap-4 md:grid-cols-3 mb-6">
-        {(['pending_payment', 'pending', 'processing', 'completed'] as QueueStatus[]).map((status) => (
-          <Card key={status}>
-            <CardHeader className="pb-2">
-              <CardTitle className="capitalize text-sm">{statusLabels[status]}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-4xl font-bold">{queueCounts[status]}</p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {submissions.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <p className="text-gray-500">No submissions yet</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-4">
-          {submissions.map((submission) => {
-            const status = getStatus(submission.id);
-
-            return (
-              <Card
-                key={submission.id}
-                className="cursor-pointer hover:shadow-lg transition-shadow"
-                onClick={() => selectSubmission(submission)}
-              >
-                <CardHeader>
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <CardTitle className="flex items-center gap-2">
-                        <User className="size-5" />
-                        {submission.question}
-                      </CardTitle>
-                      <CardDescription className="flex flex-wrap items-center gap-4 mt-2">
-                        <span>{submission.user.name}</span>
-                        <span>{format(new Date(submission.createdAt), 'MMM dd, yyyy HH:mm')}</span>
-                      </CardDescription>
+      {/* Payment Verification tab */}
+      {view === 'gems' && (
+        <>
+          {gemsLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary" />
+            </div>
+          ) : pendingPurchases.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <Gem className="size-10 text-muted-foreground mx-auto mb-3" />
+                <p className="text-muted-foreground">No pending payment requests</p>
+                <p className="text-xs text-muted-foreground mt-1">Requests appear here when a user selects a gem pack and initiates PayNow payment.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {pendingPurchases.map((p) => (
+                <Card key={p.id}>
+                  <CardContent className="py-4">
+                    <div className="flex items-center justify-between gap-4 flex-wrap">
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <User className="size-4 text-muted-foreground" />
+                          <span className="font-medium">{p.userName || '(no name)'}</span>
+                          {p.userEmail && <span className="text-sm text-muted-foreground">{p.userEmail}</span>}
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
+                          <Gem className="size-3.5 text-purple-400" />
+                          <span>{p.pack ? `SGD ${p.pack.priceSGD} — ${p.gems} Gems` : `${p.gems} Gems`}</span>
+                          {p.pendingSubmissions > 0 && (
+                            <>
+                              <span>·</span>
+                              <Badge className="bg-purple-800/40 text-purple-300 border-purple-700 text-xs">
+                                {p.pendingSubmissions} reading{p.pendingSubmissions > 1 ? 's' : ''} queued
+                              </Badge>
+                            </>
+                          )}
+                          <span>·</span>
+                          <Calendar className="size-3.5" />
+                          <span>{format(new Date(p.requestedAt), 'MMM dd, yyyy HH:mm')}</span>
+                        </div>
+                      </div>
+                      <Button
+                        onClick={() => creditGems(p)}
+                        disabled={crediting === p.id}
+                        className="bg-purple-600 hover:bg-purple-700 text-white shrink-0"
+                      >
+                        <CheckCircle2 className="size-4 mr-2" />
+                        {crediting === p.id ? 'Crediting…' : `Credit ${p.gems} Gems`}
+                      </Button>
                     </div>
-                    <Badge className={statusStyles[status]}>{statusLabels[status]}</Badge>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-wrap gap-2">
-                    {submission.category && (
-                      <Badge variant="outline">Category: {submission.category}</Badge>
-                    )}
-                    {submission.horoscope && (
-                      <Badge variant="outline">Horoscope: {submission.horoscope}</Badge>
-                    )}
-                    {submission.country && (
-                      <Badge variant="outline">Country: {submission.country}</Badge>
-                    )}
-                    {submission.gender && (
-                      <Badge variant="outline">Gender: {submission.gender}</Badge>
-                    )}
-                    {status === 'completed' && (
-                      <Badge variant="secondary" className="gap-1">
-                        <CheckCircle2 className="size-3" />
-                        Reading saved
-                      </Badge>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

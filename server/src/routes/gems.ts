@@ -58,6 +58,11 @@ router.post('/purchase-request', verifyToken, async (req: AuthRequest, res: Resp
       return res.status(400).json({ error: 'Invalid pack selected' });
     }
 
+    // Replace any existing pending_purchase so admin only sees one record per user
+    await prisma.gemTransaction.deleteMany({
+      where: { userId: req.userId!, type: 'pending_purchase' },
+    });
+
     const pendingTx = await prisma.gemTransaction.create({
       data: {
         userId: req.userId!,
