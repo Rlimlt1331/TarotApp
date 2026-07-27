@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -12,9 +13,48 @@ import { usePendingSubmission } from '../context/PendingSubmissionContext';
 import { API_URL } from '../config/api';
 import { HOROSCOPES, SUGGESTED_QUESTIONS } from '../data/mockData';
 import { ReadingCategory, Gender } from '../types';
-import { Sparkles, Heart, Briefcase, Activity, Gem } from 'lucide-react';
+import { AlertCircle, Clock, Sparkles, Heart, Briefcase, Activity, Gem } from 'lucide-react';
 import { toast } from 'sonner';
 import { GemPurchaseModal } from './GemPurchaseModal';
+
+type SubmissionOutcome = 'free' | 'paid' | 'pending_payment' | 'already_pending';
+
+const OUTCOME_CONFIG: Record<SubmissionOutcome, {
+  icon: React.ReactNode;
+  iconBg: string;
+  title: string;
+  message: string;
+  okLabel: string;
+}> = {
+  free: {
+    icon: <Sparkles className="size-8 text-purple-600" />,
+    iconBg: 'bg-purple-100',
+    title: 'Reading Request Submitted!',
+    message: 'Your free reading has been submitted. Our reader will review it shortly and you\'ll be notified once it\'s ready.',
+    okLabel: 'Great, thank you!',
+  },
+  paid: {
+    icon: <Gem className="size-8 text-purple-600" />,
+    iconBg: 'bg-purple-100',
+    title: 'Reading Request Submitted!',
+    message: 'Your reading request has been submitted and 20 Gems have been deducted from your balance. Our reader will review it shortly.',
+    okLabel: 'Great, thank you!',
+  },
+  pending_payment: {
+    icon: <Clock className="size-8 text-blue-600" />,
+    iconBg: 'bg-blue-100',
+    title: 'Reading Queued — Payment Required',
+    message: 'Your reading has been queued! To activate it, please complete payment via PayNow on the next screen.\n\nOnce your payment is verified, your Gems will be credited and your reading will become active. Please allow up to 24 hours for verification.',
+    okLabel: 'Proceed to Payment',
+  },
+  already_pending: {
+    icon: <AlertCircle className="size-8 text-amber-600" />,
+    iconBg: 'bg-amber-100',
+    title: 'Reading Already Queued',
+    message: 'You already have a reading queued pending payment confirmation. Please allow up to 24 hours for your payment to be verified before submitting another request.',
+    okLabel: 'OK, understood',
+  },
+};
 
 export function RequesterPortal({ onShowAuthModal }: { onShowAuthModal: () => void }) {
   const { currentUser, addRequest } = useTarot();
@@ -27,6 +67,7 @@ export function RequesterPortal({ onShowAuthModal }: { onShowAuthModal: () => vo
   const [gender, setGender] = useState<Gender | ''>(currentUser?.gender || '');
   const [submitting, setSubmitting] = useState(false);
   const [gemModalOpen, setGemModalOpen] = useState(false);
+  const [outcomeDialog, setOutcomeDialog] = useState<SubmissionOutcome | null>(null);
 
   useEffect(() => {
     if (user && token && pendingSubmission) {
@@ -107,8 +148,7 @@ export function RequesterPortal({ onShowAuthModal }: { onShowAuthModal: () => vo
       });
 
       if (response.status === 409) {
-        const data = await response.json();
-        toast.error(data.error || 'You already have a reading pending payment confirmation.');
+        setOutcomeDialog('already_pending');
         return;
       }
 
@@ -133,15 +173,14 @@ export function RequesterPortal({ onShowAuthModal }: { onShowAuthModal: () => vo
       });
 
       clearPendingSubmission();
-
-      if (data.pendingPayment) {
-        toast.info('Your reading has been queued! Please complete payment to activate it.');
-        setGemModalOpen(true);
-      } else {
-        toast.success(isFreeReading ? 'Your free reading request has been submitted!' : 'Reading request submitted! (20 Gems deducted)');
-      }
       setCustomQuestion('');
       setSelectedQuestion('');
+
+      if (data.pendingPayment) {
+        setOutcomeDialog('pending_payment');
+      } else {
+        setOutcomeDialog(isFreeReading ? 'free' : 'paid');
+      }
     } catch (error: any) {
       toast.error(error.message || 'Failed to submit reading request');
     } finally {
@@ -376,6 +415,35 @@ export function RequesterPortal({ onShowAuthModal }: { onShowAuthModal: () => vo
       </div>
 
       <GemPurchaseModal open={gemModalOpen} onOpenChange={setGemModalOpen} />
+
+      {outcomeDialog && (() => {
+        const cfg = OUTCOME_CONFIG[outcomeDialog];
+        return (
+          <Dialog open onOpenChange={() => {}}>
+            <DialogContent className="max-w-sm text-center" onPointerDownOutside={(e) => e.preventDefault()}>
+              <DialogHeader>
+                <div className={`mx-auto mb-2 flex size-16 items-center justify-center rounded-full ${cfg.iconBg}`}>
+                  {cfg.icon}
+                </div>
+                <DialogTitle className="text-center text-lg">{cfg.title}</DialogTitle>
+              </DialogHeader>
+              <p className="text-sm text-muted-foreground whitespace-pre-line leading-relaxed">
+                {cfg.message}
+              </p>
+              <Button
+                className="w-full mt-2"
+                onClick={() => {
+                  const wasPendingPayment = outcomeDialog === 'pending_payment';
+                  setOutcomeDialog(null);
+                  if (wasPendingPayment) setGemModalOpen(true);
+                }}
+              >
+                {cfg.okLabel}
+              </Button>
+            </DialogContent>
+          </Dialog>
+        );
+      })()}
     </div>
   );
 }
