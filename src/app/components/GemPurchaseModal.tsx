@@ -25,17 +25,22 @@ export function GemPurchaseModal({ open, onOpenChange }: GemPurchaseModalProps) 
   const [step, setStep] = useState<'select' | 'pay'>('select');
 
   const handleSelectPack = async (packId: string) => {
-    setSelectedPack(packId);
     if (!token) return;
     try {
-      await fetch(`${API_URL}/gems/purchase-request`, {
+      const res = await fetch(`${API_URL}/gems/purchase-request`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ packId }),
       });
+      if (res.status === 409) {
+        const data = await res.json();
+        toast.error(data.error || 'You already have a pending payment awaiting verification.');
+        return;
+      }
     } catch {
-      // fire-and-forget
+      // non-fatal — still proceed to show PayNow instructions
     }
+    setSelectedPack(packId);
     setStep('pay');
   };
 
