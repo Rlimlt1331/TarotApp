@@ -73,7 +73,9 @@ export function GemPurchaseModal({ open, onOpenChange }: GemPurchaseModalProps) 
                   key={p.id}
                   onClick={() => handleSelectPack(p.id)}
                   className={`relative flex flex-col items-center gap-1 p-4 rounded-xl border-2 transition-all hover:shadow-md ${
-                    p.popular ? 'border-purple-400 bg-purple-50' : 'border-border hover:border-purple-300'
+                    p.popular
+                      ? 'border-purple-400 bg-purple-50 dark:bg-purple-950/40'
+                      : 'border-border bg-muted/40 hover:border-purple-300 hover:bg-purple-50/40 dark:hover:bg-purple-950/20'
                   }`}
                 >
                   {p.popular && (
@@ -96,7 +98,7 @@ export function GemPurchaseModal({ open, onOpenChange }: GemPurchaseModalProps) 
 
         {step === 'pay' && pack && (
           <div className="space-y-4 mt-2">
-            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 text-center space-y-1">
+            <div className="bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 rounded-lg p-4 text-center space-y-1">
               <p className="text-sm text-muted-foreground">You selected</p>
               <p className="font-bold text-lg">{pack.label} → {pack.gems}</p>
               <p className="text-xs text-muted-foreground">{pack.subLabel}</p>
@@ -113,7 +115,7 @@ export function GemPurchaseModal({ open, onOpenChange }: GemPurchaseModalProps) 
                 />
               </div>
 
-              <ol className="text-sm space-y-2 text-muted-foreground list-decimal list-inside">
+              <ol className="text-sm space-y-2 text-muted-foreground list-decimal list-inside bg-muted/40 rounded-lg p-3">
                 <li>Open your bank app and scan the QR code above.</li>
                 <li>Enter amount: <strong>SGD {pack.priceSGD}</strong></li>
                 <li>Add your <strong>name</strong> in the payment reference.</li>
