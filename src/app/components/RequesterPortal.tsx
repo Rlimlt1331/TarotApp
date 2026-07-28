@@ -208,6 +208,28 @@ export function RequesterPortal({ onShowAuthModal }: { onShowAuthModal: () => vo
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 md:space-y-6">
+          {user && !isFreeReading && !hasEnoughGems && (
+            hasPendingPurchase ? (
+              <div className="rounded-lg border border-blue-700 bg-blue-900/30 p-4 text-center space-y-1">
+                <p className="text-sm font-medium text-blue-300">
+                  Payment pending verification
+                </p>
+                <p className="text-xs text-blue-400">
+                  Your payment is being reviewed. Gems will be credited and your reading activated within 24 hours.
+                </p>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-amber-700 bg-amber-900/30 p-4 text-center space-y-1">
+                <p className="text-sm font-medium text-amber-300">
+                  You need 20 Gems — you have {gemBalance}.
+                </p>
+                <p className="text-xs text-amber-400">
+                  Click Submit to queue your reading and pay via PayNow. Your reading will be activated once payment is verified.
+                </p>
+              </div>
+            )
+          )}
+
           <Card className="tarot-card">
             <CardHeader>
               <CardTitle>Your Horoscope Sign</CardTitle>
@@ -359,28 +381,6 @@ export function RequesterPortal({ onShowAuthModal }: { onShowAuthModal: () => vo
               </div>
             </CardContent>
           </Card>
-
-          {user && !isFreeReading && !hasEnoughGems && (
-            hasPendingPurchase ? (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center space-y-1">
-                <p className="text-sm font-medium text-blue-800">
-                  Payment pending verification
-                </p>
-                <p className="text-xs text-blue-700">
-                  Your payment is being reviewed. Gems will be credited and your reading activated within 24 hours.
-                </p>
-              </div>
-            ) : (
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-center space-y-1">
-                <p className="text-sm font-medium text-amber-800">
-                  You need 20 Gems — you have {gemBalance}.
-                </p>
-                <p className="text-xs text-amber-700">
-                  Click Submit to queue your reading and pay via PayNow. Your reading will be activated once payment is verified.
-                </p>
-              </div>
-            )
-          )}
 
           <Button
             type="submit"
