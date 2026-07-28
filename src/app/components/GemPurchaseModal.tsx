@@ -20,7 +20,7 @@ interface GemPurchaseModalProps {
 }
 
 export function GemPurchaseModal({ open, onOpenChange }: GemPurchaseModalProps) {
-  const { token, gemBalance, freeReadingUsed, refreshGems, hasPendingPurchase } = useAuth();
+  const { token, gemBalance, freeReadingUsed, refreshGems, hasPendingPurchase, pendingPurchaseSGD } = useAuth();
   const [selectedPack, setSelectedPack] = useState<string | null>(null);
   const [step, setStep] = useState<'select' | 'pay'>('select');
 
@@ -70,8 +70,9 @@ export function GemPurchaseModal({ open, onOpenChange }: GemPurchaseModalProps) 
               <div className="flex gap-2.5 rounded-lg border border-amber-700 bg-amber-900/30 p-3 text-sm text-amber-300">
                 <AlertCircle className="size-4 shrink-0 mt-0.5 text-amber-400" />
                 <span>
-                  You have a pending payment awaiting admin verification. Selecting a new pack will
-                  update your request — the admin will credit based on your latest selection.
+                  You have a pending payment{pendingPurchaseSGD != null ? ` of SGD ${pendingPurchaseSGD}` : ''} awaiting
+                  admin verification. Selecting a new pack will update the existing payment verification
+                  request — the admin will credit based on your latest selection.
                 </span>
               </div>
             )}
@@ -99,7 +100,10 @@ export function GemPurchaseModal({ open, onOpenChange }: GemPurchaseModalProps) 
                 </button>
               ))}
             </div>
-            <p className="text-xs text-muted-foreground text-center mt-2">
+            <p className="text-xs text-muted-foreground text-center">
+              Admin will verify payment received within 24 hours of your PayNow transfer.
+            </p>
+            <p className="text-xs text-muted-foreground text-center">
               No refunds once gems have been used. Unused gems are non-refundable after purchase.
             </p>
           </div>

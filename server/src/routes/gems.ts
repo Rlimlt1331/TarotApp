@@ -29,12 +29,15 @@ router.get('/balance', verifyToken, async (req: AuthRequest, res: Response) => {
       take: 50,
     });
 
-    const hasPendingPurchase = transactions.some((t) => t.type === 'pending_purchase');
+    const pendingTx = transactions.find((t) => t.type === 'pending_purchase');
+    const hasPendingPurchase = !!pendingTx;
+    const pendingPack = pendingTx ? GEM_PACKS.find((p) => p.id === pendingTx.referenceId) ?? null : null;
 
     res.json({
       gemBalance: user?.gemBalance ?? 0,
       freeReadingUsed: user?.freeReadingUsed ?? false,
       hasPendingPurchase,
+      pendingPurchaseSGD: pendingPack?.priceSGD ?? null,
       transactions,
     });
   } catch (err) {
