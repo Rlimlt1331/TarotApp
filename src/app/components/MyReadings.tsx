@@ -4,7 +4,7 @@ import { Button } from './ui/button';
 import { useAuth } from '../context/AuthContext';
 import { API_URL } from '../config/api';
 import { format } from 'date-fns';
-import { Calendar, CheckCircle2, ExternalLink, Send, Sparkles, Star, Unlink } from 'lucide-react';
+import { Calendar, CheckCircle2, Clock, ExternalLink, Gem, Send, Sparkles, Star, Unlink } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { apiClient } from '../../lib/api-client';
@@ -199,6 +199,39 @@ function TelegramSettings({ token }: { token: string }) {
   );
 }
 
+// ─── Gem history ──────────────────────────────────────────────────────────────
+interface GemTransaction {
+  id: number;
+  type: string;
+  amount: number;
+  referenceId: string | null;
+  createdAt: string;
+}
+
+const PACK_LABELS: Record<string, { priceSGD: number }> = {
+  pack_10: { priceSGD: 10 },
+  pack_20: { priceSGD: 20 },
+  pack_50: { priceSGD: 50 },
+  pack_80: { priceSGD: 80 },
+};
+
+function resolvePackPrice(referenceId: string | null): number | null {
+  if (!referenceId) return null;
+  const packId = referenceId.replace('paynow_', '');
+  return PACK_LABELS[packId]?.priceSGD ?? null;
+}
+
+function txLabel(type: string): string {
+  switch (type) {
+    case 'purchase': return 'Gems purchased';
+    case 'pending_purchase': return 'Pending payment verification';
+    case 'reading_spend': return 'Reading submitted';
+    case 'rating_bonus': return 'Rating bonus';
+    default: return type;
+  }
+}
+
+// ─── Submission types ─────────────────────────────────────────────────────────
 interface DetectedCard {
   id: number;
   name: string;
@@ -229,10 +262,13 @@ interface Submission {
 }
 
 export function MyReadings() {
-  const { user, token } = useAuth();
+  const { user, token, gemBalance, freeReadingUsed } = useAuth();
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
+  const [view, setView] = useState<'readings' | 'history'>('readings');
+  const [transactions, setTransactions] = useState<GemTransaction[]>([]);
+  const [transactionsLoading, setTransactionsLoading] = useState(false);
 
   useEffect(() => {
     const fetchSubmissions = async () => {
@@ -246,9 +282,18 @@ export function MyReadings() {
         setLoading(false);
       }
     };
-
     fetchSubmissions();
   }, [user]);
+
+  useEffect(() => {
+    if (!token) return;
+    setTransactionsLoading(true);
+    fetch(`${API_URL}/gems/balance`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.json())
+      .then((data) => setTransactions(data.transactions ?? []))
+      .catch(() => {})
+      .finally(() => setTransactionsLoading(false));
+  }, [token]);
 
   const categoryColors: Record<string, string> = {
     relationships: 'bg-pink-500/10 text-pink-700 border-pink-200',
@@ -282,6 +327,7 @@ export function MyReadings() {
           </p>
         </div>
 
+        {/* Stats */}
         <div className={`grid grid-cols-1 gap-4 ${pendingPaymentCount > 0 ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
           <Card className="tarot-card bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950 dark:to-purple-900 border-purple-200">
             <CardHeader className="pb-3">
@@ -319,95 +365,217 @@ export function MyReadings() {
           )}
         </div>
 
-        {token && <TelegramSettings token={token} />}
+        {/* Tab bar */}
+        <div className="border-b border-border">
+          <div className="flex">
+            <button
+              onClick={() => setView('readings')}
+              className={`px-5 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                view === 'readings'
+                  ? 'border-primary text-foreground'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              My Readings
+            </button>
+            <button
+              onClick={() => setView('history')}
+              className={`flex items-center gap-2 px-5 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                view === 'history'
+                  ? 'border-primary text-foreground'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Gem className="size-3.5" />
+              Gem History
+            </button>
+          </div>
+        </div>
 
-        <div className="space-y-4">
-          <h2 className="text-2xl">Your Readings</h2>
-          {submissions.length === 0 ? (
-            <Card>
-              <CardContent className="py-12 text-center">
-                <p className="text-muted-foreground">No readings yet</p>
-              </CardContent>
-            </Card>
-          ) : (
-            submissions.map((submission) => {
-              const category = submission.category || 'general';
-              const isCompleted = submission.reading !== null;
-              const isPendingPayment = submission.pendingPayment;
+        {/* My Readings tab */}
+        {view === 'readings' && (
+          <div className="space-y-6">
+            {token && <TelegramSettings token={token} />}
 
-              return (
-                <Card key={submission.id} className="tarot-card">
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div className="space-y-1">
-                        <CardTitle className="flex items-center gap-2">
-                          <Sparkles className="size-5" />
-                          {submission.question}
-                        </CardTitle>
-                        <CardDescription className="flex items-center gap-4 text-sm">
-                          <span className="flex items-center gap-1">
-                            <Calendar className="size-4" />
-                            {format(new Date(submission.createdAt), 'MMM dd, yyyy')}
-                          </span>
-                          <Badge className={categoryColors[category] || categoryColors.general}>
-                            {category}
-                          </Badge>
-                          {isPendingPayment && (
-                            <Badge className="bg-purple-500/10 text-purple-700 border-purple-200 flex items-center gap-1.5">
-                              <span className="relative flex size-2">
-                                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-purple-400 opacity-75" />
-                                <span className="relative inline-flex size-2 rounded-full bg-purple-500" />
-                              </span>
-                              Pending payment confirmation
-                            </Badge>
-                          )}
-                          {!isCompleted && !isPendingPayment && (
-                            <Badge className="bg-amber-500/10 text-amber-700 border-amber-200 flex items-center gap-1.5">
-                              <span className="relative flex size-2">
-                                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
-                                <span className="relative inline-flex size-2 rounded-full bg-amber-500" />
-                              </span>
-                              Reading in progress
-                            </Badge>
-                          )}
-                        </CardDescription>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {isCompleted && submission.reading!.detectedCards.length > 0 && (
-                      <div>
-                        <p className="text-sm font-medium mb-2">Cards Detected:</p>
-                        <div className="flex flex-wrap gap-2">
-                          {submission.reading!.detectedCards.map((card) => (
-                            <Badge key={card.id} variant="outline">
-                              {card.name}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    <div>
-                      <p className="text-sm font-medium mb-2">Reading Summary:</p>
-                      <p className="text-sm text-muted-foreground line-clamp-3">
-                        {submission.reading?.harmonisedReading || 'Your reading is being prepared by the reader. Check back soon.'}
-                      </p>
-                    </div>
-
-                    <Button
-                      variant="outline"
-                      onClick={() => setSelectedSubmission(submission)}
-                      className="w-full"
-                    >
-                      View Full Reading
-                    </Button>
+            <div className="space-y-4">
+              <h2 className="text-2xl">Your Readings</h2>
+              {submissions.length === 0 ? (
+                <Card>
+                  <CardContent className="py-12 text-center">
+                    <p className="text-muted-foreground">No readings yet</p>
                   </CardContent>
                 </Card>
-              );
-            })
-          )}
-        </div>
+              ) : (
+                submissions.map((submission) => {
+                  const category = submission.category || 'general';
+                  const isCompleted = submission.reading !== null;
+                  const isPendingPayment = submission.pendingPayment;
+
+                  return (
+                    <Card key={submission.id} className="tarot-card">
+                      <CardHeader>
+                        <div className="flex items-start justify-between">
+                          <div className="space-y-1">
+                            <CardTitle className="flex items-center gap-2">
+                              <Sparkles className="size-5" />
+                              {submission.question}
+                            </CardTitle>
+                            <CardDescription className="flex items-center gap-4 text-sm">
+                              <span className="flex items-center gap-1">
+                                <Calendar className="size-4" />
+                                {format(new Date(submission.createdAt), 'MMM dd, yyyy')}
+                              </span>
+                              <Badge className={categoryColors[category] || categoryColors.general}>
+                                {category}
+                              </Badge>
+                              {isPendingPayment && (
+                                <Badge className="bg-purple-500/10 text-purple-700 border-purple-200 flex items-center gap-1.5">
+                                  <span className="relative flex size-2">
+                                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-purple-400 opacity-75" />
+                                    <span className="relative inline-flex size-2 rounded-full bg-purple-500" />
+                                  </span>
+                                  Pending payment confirmation
+                                </Badge>
+                              )}
+                              {!isCompleted && !isPendingPayment && (
+                                <Badge className="bg-amber-500/10 text-amber-700 border-amber-200 flex items-center gap-1.5">
+                                  <span className="relative flex size-2">
+                                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
+                                    <span className="relative inline-flex size-2 rounded-full bg-amber-500" />
+                                  </span>
+                                  Reading in progress
+                                </Badge>
+                              )}
+                            </CardDescription>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        {isCompleted && submission.reading!.detectedCards.length > 0 && (
+                          <div>
+                            <p className="text-sm font-medium mb-2">Cards Detected:</p>
+                            <div className="flex flex-wrap gap-2">
+                              {submission.reading!.detectedCards.map((card) => (
+                                <Badge key={card.id} variant="outline">
+                                  {card.name}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        <div>
+                          <p className="text-sm font-medium mb-2">Reading Summary:</p>
+                          <p className="text-sm text-muted-foreground line-clamp-3">
+                            {submission.reading?.harmonisedReading || 'Your reading is being prepared by the reader. Check back soon.'}
+                          </p>
+                        </div>
+
+                        <Button
+                          variant="outline"
+                          onClick={() => setSelectedSubmission(submission)}
+                          className="w-full"
+                        >
+                          View Full Reading
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Gem History tab */}
+        {view === 'history' && (
+          <div className="space-y-4">
+            {/* Balance summary */}
+            <Card className="tarot-card">
+              <CardContent className="py-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Gem className="size-5 text-purple-400" />
+                    <span className="font-medium">Current Balance</span>
+                  </div>
+                  <span className="text-2xl font-bold text-purple-400">
+                    {freeReadingUsed ? `${gemBalance} Gems` : 'Free reading available'}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Transaction list */}
+            {transactionsLoading ? (
+              <div className="flex justify-center py-10">
+                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary" />
+              </div>
+            ) : transactions.length === 0 ? (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <Gem className="size-10 text-muted-foreground mx-auto mb-3" />
+                  <p className="text-muted-foreground">No gem transactions yet</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-2">
+                {transactions.map((tx) => {
+                  const isCredit = tx.amount > 0;
+                  const isPending = tx.type === 'pending_purchase';
+                  const packPrice = resolvePackPrice(tx.referenceId);
+
+                  return (
+                    <Card key={tx.id} className="tarot-card">
+                      <CardContent className="py-3">
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className={`flex size-9 shrink-0 items-center justify-center rounded-full ${
+                              isPending
+                                ? 'bg-amber-900/30'
+                                : isCredit
+                                  ? 'bg-green-900/30'
+                                  : 'bg-purple-900/30'
+                            }`}>
+                              {isPending
+                                ? <Clock className="size-4 text-amber-400" />
+                                : <Gem className={`size-4 ${isCredit ? 'text-green-400' : 'text-purple-400'}`} />
+                              }
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium">{txLabel(tx.type)}</p>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-xs text-muted-foreground">
+                                  {format(new Date(tx.createdAt), 'MMM dd, yyyy HH:mm')}
+                                </span>
+                                {packPrice != null && (
+                                  <span className="text-xs text-muted-foreground">· SGD {packPrice}</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <span className={`text-sm font-semibold shrink-0 ${
+                            isPending
+                              ? 'text-amber-400'
+                              : isCredit
+                                ? 'text-green-400'
+                                : 'text-muted-foreground'
+                          }`}>
+                            {isPending
+                              ? `${tx.amount} Gems (pending)`
+                              : isCredit
+                                ? `+${tx.amount} Gems`
+                                : `${tx.amount} Gems`
+                            }
+                          </span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <Dialog open={!!selectedSubmission} onOpenChange={() => setSelectedSubmission(null)}>
