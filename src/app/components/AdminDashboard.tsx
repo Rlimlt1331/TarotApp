@@ -92,10 +92,10 @@ const agentNames = [
 ];
 
 const statusStyles: Record<QueueStatus, string> = {
-  pending: 'bg-amber-500/10 text-amber-700 border-amber-200',
-  processing: 'bg-blue-500/10 text-blue-700 border-blue-200',
-  completed: 'bg-green-500/10 text-green-700 border-green-200',
-  pending_payment: 'bg-purple-500/10 text-purple-700 border-purple-200',
+  pending: 'bg-amber-900/30 text-amber-300 border-amber-700',
+  processing: 'bg-blue-900/30 text-blue-300 border-blue-700',
+  completed: 'bg-green-900/30 text-green-300 border-green-700',
+  pending_payment: 'bg-purple-900/30 text-purple-300 border-purple-700',
 };
 
 const statusLabels: Record<QueueStatus, string> = {

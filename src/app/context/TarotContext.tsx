@@ -16,15 +16,7 @@ interface TarotContextType {
 const TarotContext = createContext<TarotContextType | undefined>(undefined);
 
 export function TarotProvider({ children }: { children: ReactNode }) {
-  const [currentUser, setCurrentUser] = useState<User | null>({
-    id: 'user-1',
-    name: 'Sarah Johnson',
-    email: 'sarah@example.com',
-    horoscope: 'Pisces',
-    country: 'United States',
-    gender: 'female',
-    readingsCount: 0,
-  });
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   const [isReader, setIsReader] = useState(false);
   const [requests, setRequests] = useState<ReadingRequest[]>([]);

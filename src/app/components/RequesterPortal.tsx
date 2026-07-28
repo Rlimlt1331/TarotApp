@@ -7,7 +7,6 @@ import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Badge } from './ui/badge';
-import { useTarot } from '../context/TarotContext';
 import { useAuth } from '../context/AuthContext';
 import { usePendingSubmission } from '../context/PendingSubmissionContext';
 import { API_URL } from '../config/api';
@@ -57,14 +56,13 @@ const OUTCOME_CONFIG: Record<SubmissionOutcome, {
 };
 
 export function RequesterPortal({ onShowAuthModal }: { onShowAuthModal: () => void }) {
-  const { currentUser, addRequest } = useTarot();
   const { user, token, gemBalance, freeReadingUsed, hasPendingPurchase, refreshGems } = useAuth();
   const { pendingSubmission, setPendingSubmission, clearPendingSubmission } = usePendingSubmission();
   const [selectedCategory, setSelectedCategory] = useState<ReadingCategory>('relationships');
   const [customQuestion, setCustomQuestion] = useState('');
   const [selectedQuestion, setSelectedQuestion] = useState('');
-  const [horoscope, setHoroscope] = useState(currentUser?.horoscope || '');
-  const [gender, setGender] = useState<Gender | ''>(currentUser?.gender || '');
+  const [horoscope, setHoroscope] = useState('');
+  const [gender, setGender] = useState<Gender | ''>('');
   const [submitting, setSubmitting] = useState(false);
   const [gemModalOpen, setGemModalOpen] = useState(false);
   const [outcomeDialog, setOutcomeDialog] = useState<SubmissionOutcome | null>(null);
@@ -110,7 +108,7 @@ export function RequesterPortal({ onShowAuthModal }: { onShowAuthModal: () => vo
       return;
     }
 
-    if (!user || !token) {
+    if (!token || !user) {
       setPendingSubmission({
         readingData: {
           category: selectedCategory,
@@ -122,11 +120,6 @@ export function RequesterPortal({ onShowAuthModal }: { onShowAuthModal: () => vo
       } as any);
       toast.error('Please log in to submit a reading request');
       onShowAuthModal();
-      return;
-    }
-
-    if (!currentUser) {
-      toast.error('Please complete your profile first');
       return;
     }
 
@@ -159,19 +152,6 @@ export function RequesterPortal({ onShowAuthModal }: { onShowAuthModal: () => vo
 
       const data = await response.json();
       await refreshGems();
-
-      addRequest({
-        userId: currentUser.id,
-        userName: user.name || currentUser.name || '',
-        category: selectedCategory,
-        question,
-        userInfo: {
-          horoscope: horoscope,
-          gender: gender as Gender,
-        },
-        isFreeReading,
-      });
-
       clearPendingSubmission();
       setCustomQuestion('');
       setSelectedQuestion('');

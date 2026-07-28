@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { prisma } from '../index.js';
 import { verifyToken, AuthRequest } from '../middleware/verifyToken.js';
+import { verifyAdmin } from '../middleware/verifyAdmin.js';
 import { notifyReaderNewSubmission } from '../services/telegramService.js';
 
 const router = Router();
@@ -91,10 +92,8 @@ router.post('/purchase-request', verifyToken, async (req: AuthRequest, res: Resp
 });
 
 // Admin: list all pending purchase requests
-router.get('/admin/pending', verifyToken, async (req: AuthRequest, res: Response) => {
+router.get('/admin/pending', verifyAdmin, async (req: AuthRequest, res: Response) => {
   try {
-    const adminUser = await prisma.user.findUnique({ where: { id: req.userId! }, select: { role: true } });
-    if (adminUser?.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
 
     const pending = await prisma.gemTransaction.findMany({
       where: { type: 'pending_purchase' },
@@ -129,13 +128,8 @@ router.get('/admin/pending', verifyToken, async (req: AuthRequest, res: Response
 
 // Admin: credit gems after verifying PayNow payment
 // pendingId: optional — if provided, deletes the pending_purchase record
-router.post('/admin/credit', verifyToken, async (req: AuthRequest, res: Response) => {
+router.post('/admin/credit', verifyAdmin, async (req: AuthRequest, res: Response) => {
   try {
-    const adminUser = await prisma.user.findUnique({ where: { id: req.userId! }, select: { role: true } });
-    if (adminUser?.role !== 'admin') {
-      return res.status(403).json({ error: 'Forbidden' });
-    }
-
     const { userId, packId, pendingId, note } = req.body;
     const pack = GEM_PACKS.find((p) => p.id === packId);
     if (!pack || !userId) {

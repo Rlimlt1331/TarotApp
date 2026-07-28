@@ -207,14 +207,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({ open, onOpenChange }) => {
                   </div>
                 </>
               ) : (
-                <div className="rounded-md bg-amber-50 border border-amber-200 px-3 py-3 text-sm space-y-1">
-                  <p className="font-medium text-amber-800">Telegram login is not available right now.</p>
-                  <p className="text-amber-700">
+                <div className="rounded-md bg-amber-900/30 border border-amber-700 px-3 py-3 text-sm space-y-1">
+                  <p className="font-medium text-amber-300">Telegram login is not available right now.</p>
+                  <p className="text-amber-400">
                     The bot hasn't been configured yet. Please{' '}
                     <button
                       type="button"
                       onClick={resetTg}
-                      className="underline font-medium hover:text-amber-900"
+                      className="underline font-medium hover:text-amber-300"
                     >
                       sign up or log in with email
                     </button>{' '}

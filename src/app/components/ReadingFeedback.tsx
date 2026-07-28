@@ -156,13 +156,13 @@ export const ReadingFeedback: React.FC<ReadingFeedbackProps> = ({ submissionId, 
                 className={
                   star <= (hoveredRating || rating)
                     ? 'fill-yellow-400 text-yellow-400'
-                    : 'text-gray-300'
+                    : 'text-muted-foreground'
                 }
               />
             </button>
           ))}
         </div>
-        {rating > 0 && <p className="text-sm text-gray-600 mt-1">{rating} out of 5</p>}
+        {rating > 0 && <p className="text-sm text-muted-foreground mt-1">{rating} out of 5</p>}
       </div>
 
       <div>
@@ -191,11 +191,9 @@ export const ReadingFeedback: React.FC<ReadingFeedbackProps> = ({ submissionId, 
       </div>
 
       {feedback && (
-        <div className="bg-gray-50 p-3 rounded text-sm">
-          <p className="text-gray-600">
-            Last updated: {new Date(feedback.updatedAt).toLocaleDateString()}
-          </p>
-        </div>
+        <p className="text-xs text-muted-foreground">
+          Last updated: {new Date(feedback.updatedAt).toLocaleDateString()}
+        </p>
       )}
     </div>
   );

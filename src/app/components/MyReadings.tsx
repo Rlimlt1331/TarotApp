@@ -251,10 +251,10 @@ export function MyReadings() {
   }, [user]);
 
   const categoryColors: Record<string, string> = {
-    relationships: 'bg-pink-500/10 text-pink-700 border-pink-200',
-    career: 'bg-blue-500/10 text-blue-700 border-blue-200',
-    health: 'bg-green-500/10 text-green-700 border-green-200',
-    general: 'bg-purple-500/10 text-purple-700 border-purple-200',
+    relationships: 'bg-pink-900/30 text-pink-300 border-pink-700',
+    career: 'bg-blue-900/30 text-blue-300 border-blue-700',
+    health: 'bg-green-900/30 text-green-300 border-green-700',
+    general: 'bg-purple-900/30 text-purple-300 border-purple-700',
   };
 
   const completedCount = submissions.filter(s => s.reading !== null).length;
@@ -284,37 +284,37 @@ export function MyReadings() {
 
         {/* Stats */}
         <div className={`grid grid-cols-1 gap-4 ${pendingPaymentCount > 0 ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
-          <Card className="tarot-card bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950 dark:to-purple-900 border-purple-200">
+          <Card className="tarot-card bg-purple-900/20 border-purple-800">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm text-purple-900 dark:text-purple-100">Total Requests</CardTitle>
+              <CardTitle className="text-sm text-purple-300">Total Requests</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-4xl font-bold text-purple-600">{submissions.length}</div>
+              <div className="text-4xl font-bold text-purple-400">{submissions.length}</div>
             </CardContent>
           </Card>
-          <Card className="tarot-card bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900 border-green-200">
+          <Card className="tarot-card bg-green-900/20 border-green-800">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm text-green-900 dark:text-green-100">Completed</CardTitle>
+              <CardTitle className="text-sm text-green-300">Completed</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-4xl font-bold text-green-600">{completedCount}</div>
+              <div className="text-4xl font-bold text-green-400">{completedCount}</div>
             </CardContent>
           </Card>
-          <Card className="tarot-card bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-950 dark:to-amber-900 border-amber-200">
+          <Card className="tarot-card bg-amber-900/20 border-amber-800">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm text-amber-900 dark:text-amber-100">Pending</CardTitle>
+              <CardTitle className="text-sm text-amber-300">Pending</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-4xl font-bold text-amber-600">{pendingCount}</div>
+              <div className="text-4xl font-bold text-amber-400">{pendingCount}</div>
             </CardContent>
           </Card>
           {pendingPaymentCount > 0 && (
-            <Card className="tarot-card bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950 dark:to-purple-900 border-purple-300">
+            <Card className="tarot-card bg-purple-900/20 border-purple-800">
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm text-purple-900 dark:text-purple-100">Pending Payment</CardTitle>
+                <CardTitle className="text-sm text-purple-300">Pending Payment</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-4xl font-bold text-purple-600">{pendingPaymentCount}</div>
+                <div className="text-4xl font-bold text-purple-400">{pendingPaymentCount}</div>
               </CardContent>
             </Card>
           )}
@@ -354,7 +354,7 @@ export function MyReadings() {
                                 {category}
                               </Badge>
                               {isPendingPayment && (
-                                <Badge className="bg-purple-500/10 text-purple-700 border-purple-200 flex items-center gap-1.5">
+                                <Badge className="bg-purple-900/30 text-purple-300 border-purple-700 flex items-center gap-1.5">
                                   <span className="relative flex size-2">
                                     <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-purple-400 opacity-75" />
                                     <span className="relative inline-flex size-2 rounded-full bg-purple-500" />
@@ -363,7 +363,7 @@ export function MyReadings() {
                                 </Badge>
                               )}
                               {!isCompleted && !isPendingPayment && (
-                                <Badge className="bg-amber-500/10 text-amber-700 border-amber-200 flex items-center gap-1.5">
+                                <Badge className="bg-amber-900/30 text-amber-300 border-amber-700 flex items-center gap-1.5">
                                   <span className="relative flex size-2">
                                     <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
                                     <span className="relative inline-flex size-2 rounded-full bg-amber-500" />

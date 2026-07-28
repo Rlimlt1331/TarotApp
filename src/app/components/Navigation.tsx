@@ -52,17 +52,9 @@ export function Navigation({ onEditProfile }: { onEditProfile: () => void }) {
 
                   return (
                     <Link key={item.path} to={item.path}>
-                      <Button
-                        variant={isActive ? 'default' : 'ghost'}
-                        className="relative"
-                      >
+                      <Button variant={isActive ? 'default' : 'ghost'}>
                         <Icon className="size-4 mr-2" />
                         {item.label}
-                        {item.badge !== undefined && item.badge > 0 && (
-                          <Badge className="ml-2 h-5 px-1 min-w-5 flex items-center justify-center">
-                            {item.badge}
-                          </Badge>
-                        )}
                       </Button>
                     </Link>
                   );
@@ -76,7 +68,7 @@ export function Navigation({ onEditProfile }: { onEditProfile: () => void }) {
                   {!isAdmin && (
                     <button
                       onClick={() => setGemModalOpen(true)}
-                      className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-purple-300 bg-purple-50 hover:bg-purple-100 transition-colors text-sm font-medium text-purple-700"
+                      className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-purple-700 bg-purple-900/40 hover:bg-purple-900/60 transition-colors text-sm font-medium text-purple-300"
                       title="Tarot Gems balance — click to top up"
                     >
                       <Gem className="size-3.5 text-purple-500" />
@@ -135,18 +127,9 @@ export function Navigation({ onEditProfile }: { onEditProfile: () => void }) {
 
               return (
                 <Link key={item.path} to={item.path}>
-                  <Button
-                    variant={isActive ? 'default' : 'ghost'}
-                    size="sm"
-                    className="relative whitespace-nowrap"
-                  >
+                  <Button variant={isActive ? 'default' : 'ghost'} size="sm" className="whitespace-nowrap">
                     <Icon className="size-4 mr-2" />
                     {item.label}
-                    {item.badge !== undefined && item.badge > 0 && (
-                      <Badge className="ml-2 h-5 px-1 min-w-5 flex items-center justify-center">
-                        {item.badge}
-                      </Badge>
-                    )}
                   </Button>
                 </Link>
               );
