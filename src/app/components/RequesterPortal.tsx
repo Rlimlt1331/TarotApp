@@ -199,25 +199,11 @@ export function RequesterPortal({ onShowAuthModal }: { onShowAuthModal: () => vo
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             Connect with experienced tarot readers for guidance on your life's journey
           </p>
-          {isFreeReading ? (
+          {isFreeReading && (
             <Badge className="text-lg px-6 py-2 free-badge text-white border-0">
               <Sparkles className="size-4 mr-2" />
               First Reading Free
             </Badge>
-          ) : (
-            user && (
-              <div className="flex items-center gap-3">
-                <Badge variant="outline" className="text-base px-4 py-1.5 border-purple-300 text-purple-700">
-                  <Gem className="size-4 mr-2 text-purple-500" />
-                  {gemBalance} Gems
-                </Badge>
-                {!hasEnoughGems && (
-                  <Button size="sm" variant="outline" onClick={() => setGemModalOpen(true)} className="border-purple-400 text-purple-700 hover:bg-purple-50">
-                    Top Up Gems
-                  </Button>
-                )}
-              </div>
-            )
           )}
         </div>
 
