@@ -8,6 +8,7 @@ import { Navigation } from './components/Navigation';
 import { RequesterPortal } from './components/RequesterPortal';
 import { ReaderPortal } from './components/ReaderPortal';
 import { MyReadings } from './components/MyReadings';
+import { GemHistory } from './components/GemHistory';
 import { UserProfile } from './components/UserProfile';
 import { AuthModal } from './components/AuthModal';
 import { PrivateRoute, AdminRoute } from './components/ProtectedRoutes';
@@ -85,6 +86,16 @@ function AppContent() {
                 <RequesterOnlyRoute>
                   <PrivateRoute>
                   <MyReadings />
+                  </PrivateRoute>
+                </RequesterOnlyRoute>
+              }
+            />
+            <Route
+              path="/gem-history"
+              element={
+                <RequesterOnlyRoute>
+                  <PrivateRoute>
+                    <GemHistory />
                   </PrivateRoute>
                 </RequesterOnlyRoute>
               }

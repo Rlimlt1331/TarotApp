@@ -29,7 +29,10 @@ export function Navigation({ onEditProfile }: { onEditProfile: () => void }) {
     ? [{ path: '/reader', label: 'Reader Portal', icon: Eye, badge: pendingCount }]
     : [
         { path: '/request', label: 'Request Reading', icon: Sparkles },
-        ...(user ? [{ path: '/my-readings', label: 'My Readings', icon: BookOpen }] : []),
+        ...(user ? [
+          { path: '/my-readings', label: 'My Readings', icon: BookOpen },
+          { path: '/gem-history', label: 'Gem History', icon: Gem },
+        ] : []),
       ];
   const homePath = isAdmin ? '/reader' : '/request';
 
