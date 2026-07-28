@@ -27,40 +27,7 @@ export function TarotProvider({ children }: { children: ReactNode }) {
   });
 
   const [isReader, setIsReader] = useState(false);
-  const [requests, setRequests] = useState<ReadingRequest[]>([
-    {
-      id: 'req-1',
-      userId: 'user-2',
-      userName: 'Michael Chen',
-      category: 'career',
-      question: 'Should I change my current job?',
-      userInfo: {
-        horoscope: 'Leo',
-        country: 'Singapore',
-        gender: 'male',
-        occupation: 'Software Engineer',
-      },
-      status: 'pending',
-      createdAt: new Date('2026-05-23T10:30:00'),
-      isFreeReading: true,
-    },
-    {
-      id: 'req-2',
-      userId: 'user-3',
-      userName: 'Emma Williams',
-      category: 'relationships',
-      question: 'What does my romantic future hold?',
-      userInfo: {
-        horoscope: 'Taurus',
-        country: 'United Kingdom',
-        gender: 'female',
-        occupation: 'Marketing Manager',
-      },
-      status: 'pending',
-      createdAt: new Date('2026-05-23T14:15:00'),
-      isFreeReading: false,
-    },
-  ]);
+  const [requests, setRequests] = useState<ReadingRequest[]>([]);
 
   const [readings, setReadings] = useState<Reading[]>([]);
 

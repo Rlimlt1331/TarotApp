@@ -1,7 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
-import { useTarot } from '../context/TarotContext';
 import { useAuth } from '../context/AuthContext';
 import { Sparkles, User, BookOpen, Eye, LogOut, LogIn, Gem } from 'lucide-react';
 import { useState } from 'react';
@@ -18,15 +17,12 @@ import {
 
 export function Navigation({ onEditProfile }: { onEditProfile: () => void }) {
   const location = useLocation();
-  const { requests } = useTarot();
   const { user, logout, isAdmin, gemBalance, freeReadingUsed } = useAuth();
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [gemModalOpen, setGemModalOpen] = useState(false);
 
-  const pendingCount = requests.filter(r => r.status === 'pending').length;
-
   const navItems = isAdmin
-    ? [{ path: '/reader', label: 'Reader Portal', icon: Eye, badge: pendingCount }]
+    ? [{ path: '/reader', label: 'Reader Portal', icon: Eye }]
     : [
         { path: '/request', label: 'Request Reading', icon: Sparkles },
         ...(user ? [
