@@ -187,7 +187,7 @@ export const AdminDashboard: React.FC = () => {
       }
       const data = await res.json();
       toast.success(`${data.message} to ${purchase.userName || purchase.userEmail}`);
-      await fetchPendingPurchases();
+      await Promise.all([fetchPendingPurchases(), fetchSubmissions()]);
     } catch (err: any) {
       toast.error(err.message || 'Failed to credit gems');
     } finally {
