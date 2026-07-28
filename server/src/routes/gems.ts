@@ -58,24 +58,13 @@ router.post('/purchase-request', verifyToken, async (req: AuthRequest, res: Resp
       return res.status(400).json({ error: 'Invalid pack selected' });
     }
 
-    // If user already has a pending_purchase for a DIFFERENT pack, it means they
-    // have likely already paid and are awaiting admin verification — block the request
-    // to avoid overwriting a real payment record.
-    // Selecting the same pack twice (or re-selecting while still on the PayNow screen)
-    // is idempotent and always allowed.
-    const existing = await prisma.gemTransaction.findFirst({
+    // One pending_purchase per user at any time — always replace.
+    // The frontend warns the user if they had previously clicked "Done — I've paid"
+    // before changing their selection, but ultimately allows the overwrite since
+    // there is no real-time PayNow integration to confirm payment.
+    await prisma.gemTransaction.deleteMany({
       where: { userId: req.userId!, type: 'pending_purchase' },
     });
-    if (existing && existing.referenceId !== packId) {
-      return res.status(409).json({
-        error: 'You already have a pending payment awaiting verification. Please wait for it to be processed before selecting a new pack.',
-      });
-    }
-
-    // Remove any same-pack duplicate before creating fresh record
-    if (existing) {
-      await prisma.gemTransaction.delete({ where: { id: existing.id } });
-    }
 
     const pendingTx = await prisma.gemTransaction.create({
       data: {

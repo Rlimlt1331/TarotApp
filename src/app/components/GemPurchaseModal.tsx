@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
-import { Gem } from 'lucide-react';
+import { AlertCircle, Gem } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { API_URL } from '../config/api';
 import { toast } from 'sonner';
@@ -20,25 +20,20 @@ interface GemPurchaseModalProps {
 }
 
 export function GemPurchaseModal({ open, onOpenChange }: GemPurchaseModalProps) {
-  const { token, gemBalance, freeReadingUsed, refreshGems } = useAuth();
+  const { token, gemBalance, freeReadingUsed, refreshGems, hasPendingPurchase } = useAuth();
   const [selectedPack, setSelectedPack] = useState<string | null>(null);
   const [step, setStep] = useState<'select' | 'pay'>('select');
 
   const handleSelectPack = async (packId: string) => {
     if (!token) return;
     try {
-      const res = await fetch(`${API_URL}/gems/purchase-request`, {
+      await fetch(`${API_URL}/gems/purchase-request`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ packId }),
       });
-      if (res.status === 409) {
-        const data = await res.json();
-        toast.error(data.error || 'You already have a pending payment awaiting verification.');
-        return;
-      }
     } catch {
-      // non-fatal — still proceed to show PayNow instructions
+      // non-fatal — still show PayNow instructions
     }
     setSelectedPack(packId);
     setStep('pay');
@@ -71,6 +66,15 @@ export function GemPurchaseModal({ open, onOpenChange }: GemPurchaseModalProps) 
 
         {step === 'select' && (
           <div className="space-y-3 mt-2">
+            {hasPendingPurchase && (
+              <div className="flex gap-2.5 rounded-lg border border-amber-700 bg-amber-900/30 p-3 text-sm text-amber-300">
+                <AlertCircle className="size-4 shrink-0 mt-0.5 text-amber-400" />
+                <span>
+                  You have a pending payment awaiting admin verification. Selecting a new pack will
+                  update your request — the admin will credit based on your latest selection.
+                </span>
+              </div>
+            )}
             <p className="text-sm text-muted-foreground">Each reading costs <strong>20 Gems</strong>. Choose a pack:</p>
             <div className="grid grid-cols-2 gap-3">
               {PACKS.map((p) => (
