@@ -50,14 +50,13 @@ function AppContent() {
   const [showProfileSetup, setShowProfileSetup] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const { user } = useAuth();
-  const { pendingSubmission, clearPendingSubmission } = usePendingSubmission();
+  const { pendingSubmission } = usePendingSubmission();
 
   useEffect(() => {
     if (user && pendingSubmission) {
-      clearPendingSubmission();
       setShowAuthModal(false);
     }
-  }, [user, pendingSubmission, clearPendingSubmission]);
+  }, [user, pendingSubmission]);
 
   const handleShowAuthModal = () => {
     setShowAuthModal(true);
