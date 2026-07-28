@@ -27,31 +27,31 @@ const OUTCOME_CONFIG: Record<SubmissionOutcome, {
   okLabel: string;
 }> = {
   free: {
-    icon: <Sparkles className="size-8 text-purple-600" />,
-    iconBg: 'bg-purple-100',
+    icon: <Sparkles className="size-8 text-purple-400" />,
+    iconBg: 'bg-purple-900/40',
     title: 'Reading Request Submitted!',
-    message: 'Your free reading has been submitted. Our reader will review it shortly and you\'ll be notified once it\'s ready.',
+    message: 'Your free reading has been submitted. Our reader will review it shortly — check My Readings for updates.',
     okLabel: 'Great, thank you!',
   },
   paid: {
-    icon: <Gem className="size-8 text-purple-600" />,
-    iconBg: 'bg-purple-100',
+    icon: <Gem className="size-8 text-purple-400" />,
+    iconBg: 'bg-purple-900/40',
     title: 'Reading Request Submitted!',
-    message: 'Your reading request has been submitted and 20 Gems have been deducted from your balance. Our reader will review it shortly.',
+    message: 'Your reading has been submitted and 20 Gems have been deducted from your balance. Our reader will review it shortly — check My Readings for updates.',
     okLabel: 'Great, thank you!',
   },
   pending_payment: {
-    icon: <Clock className="size-8 text-blue-600" />,
-    iconBg: 'bg-blue-100',
+    icon: <Clock className="size-8 text-blue-400" />,
+    iconBg: 'bg-blue-900/40',
     title: 'Reading Queued — Payment Required',
-    message: 'Your reading has been queued! To activate it, please complete payment via PayNow on the next screen.\n\nOnce your payment is verified, your Gems will be credited and your reading will become active. Please allow up to 24 hours for verification.',
+    message: 'Your reading has been queued. To activate it, please complete your PayNow payment on the next screen.\n\nOnce your payment is verified, your Gems will be credited and your reading will become active. Please allow up to 24 hours for verification.',
     okLabel: 'Proceed to Payment',
   },
   already_pending: {
-    icon: <AlertCircle className="size-8 text-amber-600" />,
-    iconBg: 'bg-amber-100',
+    icon: <AlertCircle className="size-8 text-amber-400" />,
+    iconBg: 'bg-amber-900/40',
     title: 'Reading Already Queued',
-    message: 'You already have a reading queued pending payment confirmation. Please allow up to 24 hours for your payment to be verified before submitting another request.',
+    message: 'You already have a reading queued pending payment verification. Please allow up to 24 hours for your payment to be reviewed before submitting another request.',
     okLabel: 'OK, understood',
   },
 };
