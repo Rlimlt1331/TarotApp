@@ -19,7 +19,18 @@ setInterval(() => {
 }, 5 * 60 * 1000);
 
 // ─── Telegram bot webhook (public — called by Telegram servers) ──────────────
+// Telegram sends the TELEGRAM_WEBHOOK_SECRET value in X-Telegram-Bot-Api-Secret-Token
+// if it was provided when registering the webhook. We reject requests that don't match.
 router.post('/webhook', async (req: Request, res: Response) => {
+  const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+  if (webhookSecret) {
+    const incoming = req.headers['x-telegram-bot-api-secret-token'];
+    if (incoming !== webhookSecret) {
+      res.status(403).json({ ok: false });
+      return;
+    }
+  }
+
   res.json({ ok: true });
 
   try {

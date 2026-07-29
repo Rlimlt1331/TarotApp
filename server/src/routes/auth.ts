@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '../index.js';
 
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'your_secret_key';
+const JWT_SECRET = process.env.JWT_SECRET!;
 
 interface AuthRequest extends Request {
   userId?: number;
@@ -62,17 +62,20 @@ router.post('/login', async (req: AuthRequest, res: Response) => {
     }
 
     const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) {
-      return res.status(401).json({ error: 'Account not found. Please check your email or sign up.' });
+
+    // Use a constant-time comparison path regardless of whether user exists,
+    // to prevent user enumeration via response timing.
+    const DUMMY_HASH = '$2a$10$abcdefghijklmnopqrstuuABCDEFGHIJKLMNOPQRSTUVWXYZ012345';
+    const passwordToCheck = user?.password ?? DUMMY_HASH;
+    const isPasswordValid = await bcrypt.compare(password, passwordToCheck);
+
+    if (!user || !isPasswordValid) {
+      return res.status(401).json({ error: 'Invalid email or password.' });
     }
 
     if (!user.password) {
-      return res.status(401).json({ error: 'This account uses Telegram login. Please use /start in the Telegram bot to log in.' });
-    }
-
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid) {
-      return res.status(401).json({ error: 'Incorrect password. Please try again.' });
+      // Telegram-only account — still return a generic auth error to avoid enumeration
+      return res.status(401).json({ error: 'Invalid email or password.' });
     }
 
     const token = signToken(user.id, user.email);

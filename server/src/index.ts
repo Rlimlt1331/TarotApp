@@ -1,5 +1,7 @@
 import express, { Express, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
 
@@ -13,12 +15,19 @@ import gemsRoutes from './routes/gems.js';
 
 dotenv.config();
 
+// Fail fast if critical secrets are missing
+if (!process.env.JWT_SECRET) {
+  console.error('FATAL: JWT_SECRET environment variable is not set. Refusing to start.');
+  process.exit(1);
+}
+
 const app: Express = express();
 const port = process.env.PORT || 3000;
+const isDev = process.env.NODE_ENV !== 'production';
+
 const allowedOrigins = [
-  'http://localhost:5173',
-  'http://localhost:5174',
-  'http://localhost:5175',
+  // Only include localhost origins in local development
+  ...(isDev ? ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'] : []),
   'https://tarot-app-five-tawny.vercel.app',
   process.env.FRONTEND_URL,
   process.env.FRONTEND_URLS,
@@ -31,18 +40,41 @@ const allowedOrigins = [
 // Initialize Prisma
 export const prisma = new PrismaClient();
 
-// Middleware
+// Security headers
+app.use(helmet());
+
+// CORS
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin || allowedOrigins.includes(origin.replace(/\/$/, ''))) {
       callback(null, true);
       return;
     }
-
     callback(new Error(`CORS blocked origin: ${origin}`));
   },
   credentials: true,
 }));
+
+// Rate limiting — auth endpoints are the highest-value attack surface
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20,                   // 20 attempts per window per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.' },
+});
+
+// General API limiter — prevents bulk scraping / DoS
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 120,            // 120 req/min per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.' },
+});
+
+app.use('/api/auth', authLimiter);
+app.use('/api', apiLimiter);
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));

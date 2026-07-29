@@ -34,6 +34,13 @@ router.put('/profile', verifyToken, async (req: AuthRequest, res: Response) => {
   try {
     const { name } = req.body;
 
+    if (!name || typeof name !== 'string' || !name.trim()) {
+      return res.status(400).json({ error: 'Name is required' });
+    }
+    if (name.trim().length > 100) {
+      return res.status(400).json({ error: 'Name must be 100 characters or fewer' });
+    }
+
     const user = await prisma.user.update({
       where: { id: req.userId! },
       data: { name },

@@ -352,6 +352,11 @@ router.post('/:id/feedback', verifyToken, async (req: AuthRequest, res: Response
       return res.status(404).json({ error: 'Submission not found' });
     }
 
+    // Only the owner of the submission can leave feedback
+    if (submission.userId !== userId) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
     const existing = await prisma.feedback.findUnique({
       where: { submissionId_userId: { submissionId: parseInt(id), userId } },
     });
