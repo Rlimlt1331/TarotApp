@@ -6,7 +6,7 @@ import { Label } from './ui/label';
 import { useAuth } from '../context/AuthContext';
 import { API_URL } from '../config/api';
 import { toast } from 'sonner';
-import { CheckCircle2, ExternalLink, Send, Unlink, User } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, ExternalLink, Send, Unlink, User } from 'lucide-react';
 
 // ─── Telegram notification settings ──────────────────────────────────────────
 type TelegramStatus = { linked: boolean; notifyMode: 'notify' | 'deliver' | null };
@@ -228,9 +228,14 @@ export function UserProfile({ onComplete }: { onComplete: () => void }) {
   return (
     <div className="min-h-screen p-6 mystical-gradient-subtle">
       <div className="max-w-lg mx-auto space-y-6 py-8">
-        <div>
-          <h1 className="text-2xl font-bold">Account Settings</h1>
-          <p className="text-muted-foreground mt-1">Manage your profile and notification preferences.</p>
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={onComplete} aria-label="Back">
+            <ArrowLeft className="size-5" />
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold">Account Settings</h1>
+            <p className="text-muted-foreground mt-1">Manage your profile and notification preferences.</p>
+          </div>
         </div>
 
         <Card className="tarot-card">
@@ -257,12 +262,9 @@ export function UserProfile({ onComplete }: { onComplete: () => void }) {
                   placeholder="Your name"
                 />
               </div>
-              <div className="flex gap-3 pt-1">
-                <Button type="submit" disabled={saving} className="flex-1">
+              <div className="pt-1">
+                <Button type="submit" disabled={saving} className="w-full">
                   {saving ? 'Saving…' : 'Save'}
-                </Button>
-                <Button type="button" variant="outline" onClick={onComplete}>
-                  Cancel
                 </Button>
               </div>
             </form>
