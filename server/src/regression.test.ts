@@ -299,7 +299,7 @@ test('Tarot App Regression Test Suite', async (t) => {
   });
 
   // ─── 5. Feedback ────────────────────────────────────────────────────────────
-  await t.test('17. Feedback: Submit Feedback', async () => {
+  await t.test('17. Feedback: Submit Feedback (5 stars — triggers gem bonus)', async () => {
     const res = await fetch(`${API_URL}/submissions/${testSubmissionId}/feedback`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -310,6 +310,9 @@ test('Tarot App Regression Test Suite', async (t) => {
     const data = await res.json() as any;
     assert.strictEqual(data.rating, 5, 'Rating should be 5');
     assert.strictEqual(data.comment, 'Incredibly accurate reading!', 'Comment should match');
+    assert.ok('gemBonusAwarded' in data, 'Response should include gemBonusAwarded field');
+    assert.strictEqual(data.gemBonusAwarded, true, '5-star rating on completed reading should award gem bonus');
+    assert.ok(typeof data.bonusAmount === 'number' && data.bonusAmount > 0, 'bonusAmount should be positive');
   });
 
   await t.test('18. Feedback: Retrieve Feedback', async () => {
@@ -376,5 +379,187 @@ test('Tarot App Regression Test Suite', async (t) => {
     assert.strictEqual(res.status, 200, 'Health endpoint should return 200');
     const data = await res.json() as any;
     assert.strictEqual(data.status, 'ok', 'Status should be ok');
+  });
+
+  // ─── 7. Telegram preferences (stored in user_preferences) ──────────────────
+  await t.test('24. Telegram: Status requires auth', async () => {
+    const res = await fetch(`${API_URL}/telegram/status`);
+    assert.ok(res.status === 401 || res.status === 403, 'Should reject unauthenticated request');
+  });
+
+  await t.test('25. Telegram: Status returns linked=false for email user', async () => {
+    const res = await fetch(`${API_URL}/telegram/status`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    assert.strictEqual(res.status, 200);
+    const data = await res.json() as any;
+    assert.strictEqual(data.linked, false, 'Email-only user should not be linked');
+    assert.ok('notifyMode' in data, 'Response should include notifyMode field');
+    assert.strictEqual(data.notifyMode, null, 'notifyMode should be null for unlinked user');
+  });
+
+  await t.test('26. Telegram: Set preference saves to user_preferences', async () => {
+    const res = await fetch(`${API_URL}/telegram/preferences`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ notifyMode: 'deliver' }),
+    });
+    assert.strictEqual(res.status, 200);
+    const data = await res.json() as any;
+    assert.strictEqual(data.notifyMode, 'deliver');
+
+    // Verify saved in DB via user_preferences table (not users)
+    const pref = await prisma.userPreferences.findUnique({ where: { userId: testUserId } });
+    assert.ok(pref, 'user_preferences record should exist');
+    assert.strictEqual(pref!.telegramNotifyMode, 'deliver', 'notifyMode should be in user_preferences');
+
+    // Confirm users table no longer has the column (schema check via Prisma)
+    const user = await prisma.user.findUnique({ where: { id: testUserId } });
+    assert.ok(user, 'User should exist');
+    assert.ok(!('telegramNotifyMode' in user!), 'telegramNotifyMode should NOT be on the User model');
+  });
+
+  await t.test('27. Telegram: Preference rejects invalid notifyMode', async () => {
+    const res = await fetch(`${API_URL}/telegram/preferences`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ notifyMode: 'invalid_value' }),
+    });
+    assert.strictEqual(res.status, 400, 'Should reject invalid notifyMode');
+  });
+
+  await t.test('28. Telegram: Update preference (upsert — change to notify)', async () => {
+    const res = await fetch(`${API_URL}/telegram/preferences`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ notifyMode: 'notify' }),
+    });
+    assert.strictEqual(res.status, 200);
+    const data = await res.json() as any;
+    assert.strictEqual(data.notifyMode, 'notify');
+
+    const pref = await prisma.userPreferences.findUnique({ where: { userId: testUserId } });
+    assert.strictEqual(pref!.telegramNotifyMode, 'notify', 'Preference should be updated to notify');
+  });
+
+  // ─── 8. Profile update ──────────────────────────────────────────────────────
+  await t.test('29. Profile: Update display name', async () => {
+    const res = await fetch(`${API_URL}/users/profile`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ name: 'Updated Test User' }),
+    });
+    assert.strictEqual(res.status, 200, 'Should return 200 on profile update');
+
+    const user = await prisma.user.findUnique({ where: { id: testUserId } });
+    assert.strictEqual(user!.name, 'Updated Test User', 'Name should be updated in DB');
+  });
+
+  await t.test('30. Profile: Reject empty name', async () => {
+    const res = await fetch(`${API_URL}/users/profile`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ name: '' }),
+    });
+    assert.strictEqual(res.status, 400, 'Should reject empty name');
+  });
+
+  await t.test('31. Profile: Requires authentication', async () => {
+    const res = await fetch(`${API_URL}/users/profile`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Hacker' }),
+    });
+    assert.ok(res.status === 401 || res.status === 403, 'Should reject unauthenticated profile update');
+  });
+
+  // ─── 9. Gems ────────────────────────────────────────────────────────────────
+  await t.test('32. Gems: Purchase request creates pending transaction', async () => {
+    const res = await fetch(`${API_URL}/gems/purchase-request`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ packId: 'pack_20' }),
+    });
+    assert.strictEqual(res.status, 200);
+    const data = await res.json() as any;
+    assert.ok(data.pendingId, 'Should return pendingId');
+    assert.strictEqual(data.pack.id, 'pack_20', 'Should return correct pack');
+
+    // Verify balance response reflects pending purchase
+    const balRes = await fetch(`${API_URL}/gems/balance`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const bal = await balRes.json() as any;
+    assert.strictEqual(bal.hasPendingPurchase, true, 'hasPendingPurchase should be true');
+    assert.ok(bal.pendingPurchaseSGD > 0, 'pendingPurchaseSGD should be set');
+  });
+
+  await t.test('33. Gems: Purchase request — invalid pack → 400', async () => {
+    const res = await fetch(`${API_URL}/gems/purchase-request`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ packId: 'nonexistent_pack' }),
+    });
+    assert.strictEqual(res.status, 400, 'Should reject invalid packId');
+  });
+
+  await t.test('34. Gems: Admin can view pending purchases', async () => {
+    const res = await fetch(`${API_URL}/gems/admin/pending`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    assert.strictEqual(res.status, 200);
+    const data = await res.json() as any;
+    assert.ok(Array.isArray(data.pending), 'Should return pending array');
+    const ourPending = data.pending.find((p: any) => p.userId === testUserId);
+    assert.ok(ourPending, 'Should include the test user pending purchase');
+    assert.ok(ourPending.pack, 'Each pending entry should include pack info');
+  });
+
+  await t.test('35. Gems: Non-admin cannot view pending purchases', async () => {
+    const res = await fetch(`${API_URL}/gems/admin/pending`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    assert.ok(res.status === 401 || res.status === 403, 'Non-admin should be rejected');
+  });
+
+  await t.test('36. Gems: Admin credit — grants gems and clears pending', async () => {
+    // Get the pendingId for this user
+    const pendingRes = await fetch(`${API_URL}/gems/admin/pending`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    const pendingData = await pendingRes.json() as any;
+    const pending = pendingData.pending.find((p: any) => p.userId === testUserId);
+    assert.ok(pending, 'Should find pending purchase for test user');
+
+    const balBefore = (await (await fetch(`${API_URL}/gems/balance`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })).json() as any).gemBalance;
+
+    const creditRes = await fetch(`${API_URL}/gems/admin/credit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+      body: JSON.stringify({ userId: testUserId, packId: 'pack_20', pendingId: pending.id }),
+    });
+    assert.strictEqual(creditRes.status, 200);
+    const creditData = await creditRes.json() as any;
+    assert.ok(creditData.message.includes('gem'), 'Response should mention gems');
+
+    const balAfter = (await (await fetch(`${API_URL}/gems/balance`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })).json() as any);
+    assert.ok(balAfter.gemBalance > balBefore, 'Gem balance should increase after credit');
+    assert.strictEqual(balAfter.hasPendingPurchase, false, 'Pending purchase should be cleared after credit');
+  });
+
+  await t.test('37. Gems: Rating bonus — 4-star feedback on completed reading does not grant bonus', async () => {
+    // Update existing feedback to 4 stars — bonus already claimed in test 17, so no re-award
+    const res = await fetch(`${API_URL}/submissions/${testSubmissionId}/feedback`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ rating: 4, comment: 'Updated to 4 stars' }),
+    });
+    assert.ok([200, 201].includes(res.status));
+    const data = await res.json() as any;
+    assert.strictEqual(data.gemBonusAwarded, false, 'Bonus should not be re-awarded on feedback update');
   });
 });
