@@ -51,8 +51,8 @@ export function GemPurchaseModal({ open, onOpenChange }: GemPurchaseModalProps) 
 
   return (
     <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) { setStep('select'); setSelectedPack(null); } }}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
+      <DialogContent className="max-w-md flex flex-col max-h-[90vh]">
+        <DialogHeader className="shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <Gem className="size-5 text-purple-500" />
             Tarot Gems
@@ -65,7 +65,7 @@ export function GemPurchaseModal({ open, onOpenChange }: GemPurchaseModalProps) 
         </DialogHeader>
 
         {step === 'select' && (
-          <div className="space-y-3 mt-2">
+          <div className="space-y-3 mt-2 overflow-y-auto min-h-0">
             {hasPendingPurchase && (
               <div className="flex gap-2.5 rounded-lg border border-amber-700 bg-amber-900/30 p-3 text-sm text-amber-300">
                 <AlertCircle className="size-4 shrink-0 mt-0.5 text-amber-400" />
@@ -110,7 +110,7 @@ export function GemPurchaseModal({ open, onOpenChange }: GemPurchaseModalProps) 
         )}
 
         {step === 'pay' && pack && (
-          <div className="space-y-4 mt-2">
+          <div className="space-y-4 mt-2 overflow-y-auto min-h-0">
             <div className="bg-purple-900/40 border border-purple-700 rounded-lg p-4 text-center space-y-1">
               <p className="text-sm text-muted-foreground">You selected</p>
               <p className="font-bold text-lg">{pack.label} → {pack.gems}</p>
