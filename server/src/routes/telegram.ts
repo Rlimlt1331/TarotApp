@@ -47,7 +47,7 @@ router.post('/webhook', async (req: Request, res: Response) => {
       let user = await prisma.user.findFirst({ where: { telegramChatId: String(chatId) } });
       if (!user) {
         user = await prisma.user.create({
-          data: { name: senderName, telegramChatId: String(chatId) },
+          data: { name: senderName, telegramChatId: String(chatId), telegramNotifyMode: 'notify' },
         });
       }
 
@@ -87,7 +87,7 @@ router.post('/webhook', async (req: Request, res: Response) => {
 
       await prisma.user.update({
         where: { id: user.id },
-        data: { telegramChatId: String(chatId), telegramLinkToken: null },
+        data: { telegramChatId: String(chatId), telegramLinkToken: null, telegramNotifyMode: 'notify' },
       });
 
       await sendMessage(
@@ -117,7 +117,7 @@ router.post('/webhook', async (req: Request, res: Response) => {
         ].join('\n'));
       } else {
         const newUser = await prisma.user.create({
-          data: { name: senderName, telegramChatId: String(chatId), telegramLoginToken: loginToken, telegramLoginTokenExpiry: expiry },
+          data: { name: senderName, telegramChatId: String(chatId), telegramNotifyMode: 'notify', telegramLoginToken: loginToken, telegramLoginTokenExpiry: expiry },
         });
         const loginUrl = portalUrl ? `${portalUrl}?tg_login=${loginToken}` : null;
         await sendMessage(chatId, [
