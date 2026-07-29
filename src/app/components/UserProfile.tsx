@@ -18,15 +18,20 @@ function TelegramSettings({ token }: { token: string }) {
   const [linking, setLinking] = useState<LinkingState>('idle');
   const [saving, setSaving] = useState(false);
 
-  const fetchStatus = async () => {
+  const fetchStatus = async (): Promise<TelegramStatus | null> => {
     try {
       const res = await fetch(`${API_URL}/telegram/status`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (res.ok) setStatus(await res.json());
+      if (res.ok) {
+        const data: TelegramStatus = await res.json();
+        setStatus(data);
+        return data;
+      }
     } catch {
       // silently ignore
     }
+    return null;
   };
 
   useEffect(() => { fetchStatus(); }, [token]);
@@ -49,9 +54,9 @@ function TelegramSettings({ token }: { token: string }) {
 
   const handleVerify = async () => {
     setLinking('verifying');
-    await fetchStatus();
+    const newStatus = await fetchStatus();
     setLinking('idle');
-    if (status?.linked) {
+    if (newStatus?.linked) {
       toast.success('Telegram connected!');
     } else {
       toast.error("Not connected yet — make sure you've opened the bot and sent the start command.");
