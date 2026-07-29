@@ -55,18 +55,37 @@ const OUTCOME_CONFIG: Record<SubmissionOutcome, {
   },
 };
 
+const FORM_DRAFT_KEY = 'tarot_form_draft';
+
 export function RequesterPortal({ onShowAuthModal }: { onShowAuthModal: () => void }) {
   const { user, token, gemBalance, freeReadingUsed, hasPendingPurchase, refreshGems } = useAuth();
   const { pendingSubmission, setPendingSubmission, clearPendingSubmission } = usePendingSubmission();
-  const [selectedCategory, setSelectedCategory] = useState<ReadingCategory>('relationships');
-  const [customQuestion, setCustomQuestion] = useState('');
-  const [selectedQuestion, setSelectedQuestion] = useState('');
-  const [horoscope, setHoroscope] = useState('');
-  const [gender, setGender] = useState<Gender | ''>('');
+
+  // Read draft once on first mount so navigating away and back restores the form
+  const [draft] = useState<Record<string, string>>(() => {
+    try { return JSON.parse(sessionStorage.getItem(FORM_DRAFT_KEY) || 'null') || {}; }
+    catch { return {}; }
+  });
+
+  const [selectedCategory, setSelectedCategory] = useState<ReadingCategory>(draft.category as ReadingCategory || 'relationships');
+  const [customQuestion, setCustomQuestion] = useState(draft.customQuestion || '');
+  const [selectedQuestion, setSelectedQuestion] = useState(draft.selectedQuestion || '');
+  const [horoscope, setHoroscope] = useState(draft.horoscope || '');
+  const [gender, setGender] = useState<Gender | ''>(draft.gender as Gender || '');
   const [submitting, setSubmitting] = useState(false);
   const [gemModalOpen, setGemModalOpen] = useState(false);
   const [outcomeDialog, setOutcomeDialog] = useState<SubmissionOutcome | null>(null);
 
+  // Persist form fields across navigation
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(FORM_DRAFT_KEY, JSON.stringify({
+        category: selectedCategory, customQuestion, selectedQuestion, horoscope, gender,
+      }));
+    } catch {}
+  }, [selectedCategory, customQuestion, selectedQuestion, horoscope, gender]);
+
+  // Restore form after login (when user submitted while unauthenticated)
   useEffect(() => {
     if (user && token && pendingSubmission) {
       const data = (pendingSubmission as any).readingData;
@@ -74,10 +93,17 @@ export function RequesterPortal({ onShowAuthModal }: { onShowAuthModal: () => vo
       setCustomQuestion(data.question || '');
       setHoroscope(data.horoscope);
       setGender(data.gender);
-      toast.success('Your form data has been restored!');
       clearPendingSubmission();
+      const isFree = !freeReadingUsed;
+      const hasGems = gemBalance >= 20;
+      const msg = isFree
+        ? 'Welcome back! Your first reading is free — complete your request below.'
+        : hasGems
+          ? `Welcome back! You have ${gemBalance} Gems — your request is ready to submit.`
+          : `Welcome back! Your request has been saved. Top up Gems or submit to queue your reading.`;
+      toast.success(msg);
     }
-  }, [user, token, pendingSubmission, clearPendingSubmission]);
+  }, [user, token, pendingSubmission]);
 
   const categoryIcons = {
     relationships: Heart,
@@ -153,8 +179,12 @@ export function RequesterPortal({ onShowAuthModal }: { onShowAuthModal: () => vo
       const data = await response.json();
       await refreshGems();
       clearPendingSubmission();
+      try { sessionStorage.removeItem(FORM_DRAFT_KEY); } catch {}
+      setSelectedCategory('relationships');
       setCustomQuestion('');
       setSelectedQuestion('');
+      setHoroscope('');
+      setGender('');
 
       if (data.pendingPayment) {
         setOutcomeDialog('pending_payment');
