@@ -17,7 +17,6 @@ model User {
   updatedAt                DateTime         @updatedAt
   role                     UserRole         @default(requester)
   telegramChatId           String?
-  telegramNotifyMode       String?
   telegramLinkToken        String?          @unique
   telegramLoginToken       String?          @unique
   telegramLoginTokenExpiry DateTime?
@@ -32,13 +31,14 @@ model User {
 }
 
 model UserPreferences {
-  id        Int      @id @default(autoincrement())
-  userId    Int      @unique
-  theme     String   @default("light")
-  language  String   @default("en")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                 Int      @id @default(autoincrement())
+  userId             Int      @unique
+  theme              String   @default("light")
+  language           String   @default("en")
+  telegramNotifyMode String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_preferences")
 }

@@ -47,7 +47,12 @@ router.post('/webhook', async (req: Request, res: Response) => {
       let user = await prisma.user.findFirst({ where: { telegramChatId: String(chatId) } });
       if (!user) {
         user = await prisma.user.create({
-          data: { name: senderName, telegramChatId: String(chatId), telegramNotifyMode: 'notify' },
+          data: { name: senderName, telegramChatId: String(chatId) },
+        });
+        await prisma.userPreferences.upsert({
+          where: { userId: user.id },
+          create: { userId: user.id, telegramNotifyMode: 'notify' },
+          update: { telegramNotifyMode: 'notify' },
         });
       }
 
@@ -87,7 +92,12 @@ router.post('/webhook', async (req: Request, res: Response) => {
 
       await prisma.user.update({
         where: { id: user.id },
-        data: { telegramChatId: String(chatId), telegramLinkToken: null, telegramNotifyMode: 'notify' },
+        data: { telegramChatId: String(chatId), telegramLinkToken: null },
+      });
+      await prisma.userPreferences.upsert({
+        where: { userId: user.id },
+        create: { userId: user.id, telegramNotifyMode: 'notify' },
+        update: { telegramNotifyMode: 'notify' },
       });
 
       await sendMessage(
@@ -117,7 +127,12 @@ router.post('/webhook', async (req: Request, res: Response) => {
         ].join('\n'));
       } else {
         const newUser = await prisma.user.create({
-          data: { name: senderName, telegramChatId: String(chatId), telegramNotifyMode: 'notify', telegramLoginToken: loginToken, telegramLoginTokenExpiry: expiry },
+          data: { name: senderName, telegramChatId: String(chatId), telegramLoginToken: loginToken, telegramLoginTokenExpiry: expiry },
+        });
+        await prisma.userPreferences.upsert({
+          where: { userId: newUser.id },
+          create: { userId: newUser.id, telegramNotifyMode: 'notify' },
+          update: { telegramNotifyMode: 'notify' },
         });
         const loginUrl = portalUrl ? `${portalUrl}?tg_login=${loginToken}` : null;
         await sendMessage(chatId, [
@@ -190,9 +205,9 @@ router.get('/status', verifyToken, async (req: AuthRequest, res: Response) => {
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.userId! },
-      select: { telegramChatId: true, telegramNotifyMode: true },
+      select: { telegramChatId: true, preferences: { select: { telegramNotifyMode: true } } },
     });
-    res.json({ linked: !!user?.telegramChatId, notifyMode: user?.telegramNotifyMode ?? null });
+    res.json({ linked: !!user?.telegramChatId, notifyMode: user?.preferences?.telegramNotifyMode ?? null });
   } catch (err) {
     console.error('Telegram status error:', err);
     res.status(500).json({ error: 'Failed to fetch Telegram status' });
@@ -206,7 +221,11 @@ router.put('/preferences', verifyToken, async (req: AuthRequest, res: Response) 
     if (!['notify', 'deliver'].includes(notifyMode)) {
       return res.status(400).json({ error: 'notifyMode must be "notify" or "deliver"' });
     }
-    await prisma.user.update({ where: { id: req.userId! }, data: { telegramNotifyMode: notifyMode } });
+    await prisma.userPreferences.upsert({
+      where: { userId: req.userId! },
+      create: { userId: req.userId!, telegramNotifyMode: notifyMode },
+      update: { telegramNotifyMode: notifyMode },
+    });
     res.json({ notifyMode });
   } catch (err) {
     console.error('Telegram preferences error:', err);
@@ -219,7 +238,11 @@ router.delete('/unlink', verifyToken, async (req: AuthRequest, res: Response) =>
   try {
     await prisma.user.update({
       where: { id: req.userId! },
-      data: { telegramChatId: null, telegramNotifyMode: null, telegramLinkToken: null },
+      data: { telegramChatId: null, telegramLinkToken: null },
+    });
+    await prisma.userPreferences.updateMany({
+      where: { userId: req.userId! },
+      data: { telegramNotifyMode: null },
     });
     res.json({ message: 'Telegram unlinked successfully' });
   } catch (err) {

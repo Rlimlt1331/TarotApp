@@ -286,13 +286,14 @@ router.put('/admin/:id', verifyAdmin, async (req: AuthRequest, res: Response) =>
     if (finalSubmission) {
       prisma.user.findUnique({
         where: { id: finalSubmission.userId },
-        select: { telegramChatId: true, telegramNotifyMode: true },
+        select: { telegramChatId: true, preferences: { select: { telegramNotifyMode: true } } },
       }).then((requester) => {
-        if (requester?.telegramChatId && requester?.telegramNotifyMode) {
+        const notifyMode = requester?.preferences?.telegramNotifyMode;
+        if (requester?.telegramChatId && notifyMode) {
           notifyRequesterReadingReady(
             requester.telegramChatId,
             finalSubmission.question,
-            requester.telegramNotifyMode as 'notify' | 'deliver',
+            notifyMode as 'notify' | 'deliver',
             finalSubmission.reading?.harmonisedReading
           ).catch((err) => console.error('Telegram requester notification failed:', err));
         }
