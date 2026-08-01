@@ -1,5 +1,16 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
+// Gemini returns markdown-formatted text. Since neither the portal nor Telegram
+// renders markdown, strip common markers so the text reads as clean prose.
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/\*\*(.+?)\*\*/gs, '$1')  // **bold** → bold
+    .replace(/\*(.+?)\*/gs, '$1')       // *italic* → italic
+    .replace(/^#{1,6}\s+/gm, '')        // # Headings → plain
+    .replace(/^[-*]\s{1}/gm, '• ')      // - list items → bullet
+    .trim();
+}
+
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 const PRIMARY_GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 const GEMINI_MODELS = [
@@ -354,12 +365,12 @@ export async function generateAdvancedReading(
       generateContentWithFallback(tarotPrompt),
       generateContentWithFallback(horoscopePrompt),
     ]);
-    const tarotReading = tarotResult.result.response.text();
-    const horoscopeReading = horoscopeResult.result.response.text();
+    const tarotReading = stripMarkdown(tarotResult.result.response.text());
+    const horoscopeReading = stripMarkdown(horoscopeResult.result.response.text());
 
     const harmonizePrompt = `You are an expert harmonizer. Combine the following Tarot reading and Horoscope reading into a single cohesive, harmonized reading for the user's question: "${question}".\n\nTarot Reading: ${tarotReading}\n\nHoroscope Reading: ${horoscopeReading}`;
     const harmonizeResult = await generateContentWithFallback(harmonizePrompt);
-    const harmonizedReading = harmonizeResult.result.response.text();
+    const harmonizedReading = stripMarkdown(harmonizeResult.result.response.text());
 
     return {
       detectedCards: detectedCardObjects,
