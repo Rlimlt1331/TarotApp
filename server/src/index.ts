@@ -7,7 +7,6 @@ import { PrismaClient } from '@prisma/client';
 
 // Import routes
 import authRoutes from './routes/auth.js';
-import readingsRoutes from './routes/readings.js';
 import submissionsRoutes from './routes/submissions.js';
 import telegramRoutes from './routes/telegram.js';
 import usersRoutes from './routes/users.js';
@@ -87,7 +86,6 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 
 // Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/readings', readingsRoutes);
 app.use('/api/submissions', submissionsRoutes);
 app.use('/api/telegram', telegramRoutes);
 app.use('/api/users', usersRoutes);

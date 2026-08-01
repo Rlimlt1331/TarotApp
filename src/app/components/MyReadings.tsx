@@ -6,7 +6,7 @@ import { format } from 'date-fns';
 import { Calendar, Sparkles, Star } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
-import { apiClient } from '../../lib/api-client';
+import { API_URL } from '../config/api';
 import { ReadingFeedback } from './ReadingFeedback';
 import { toast } from 'sonner';
 
@@ -41,7 +41,7 @@ interface Submission {
 }
 
 export function MyReadings() {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
@@ -50,8 +50,11 @@ export function MyReadings() {
     const fetchSubmissions = async () => {
       if (!user) return;
       try {
-        const data = await apiClient.getSubmissions();
-        setSubmissions(data);
+        const res = await fetch(`${API_URL}/submissions`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error('Failed to fetch readings');
+        setSubmissions(await res.json());
       } catch (error: any) {
         toast.error(error.message || 'Failed to fetch readings');
       } finally {

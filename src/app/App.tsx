@@ -1,12 +1,11 @@
 import { ReactNode, useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { TarotProvider } from './context/TarotContext';
 import { AuthProvider } from './context/AuthContext';
 import { PendingSubmissionProvider, usePendingSubmission } from './context/PendingSubmissionContext';
 import { useAuth } from './context/AuthContext';
 import { Navigation } from './components/Navigation';
 import { RequesterPortal } from './components/RequesterPortal';
-import { ReaderPortal } from './components/ReaderPortal';
+import { AdminDashboard } from './components/AdminDashboard';
 import { MyReadings } from './components/MyReadings';
 import { GemHistory } from './components/GemHistory';
 import { UserProfile } from './components/UserProfile';
@@ -103,7 +102,7 @@ function AppContent() {
               path="/reader"
               element={
                 <AdminRoute>
-                  <ReaderPortal />
+                  <AdminDashboard />
                 </AdminRoute>
               }
             />
@@ -119,13 +118,11 @@ function AppContent() {
 export default function App() {
   return (
     <AuthProvider>
-      <TarotProvider>
-        <PendingSubmissionProvider>
-          <BrowserRouter>
-            <AppContent />
-          </BrowserRouter>
-        </PendingSubmissionProvider>
-      </TarotProvider>
+      <PendingSubmissionProvider>
+        <BrowserRouter>
+          <AppContent />
+        </BrowserRouter>
+      </PendingSubmissionProvider>
     </AuthProvider>
   );
 }
