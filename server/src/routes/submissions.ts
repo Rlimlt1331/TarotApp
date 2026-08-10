@@ -3,6 +3,7 @@ import { prisma } from '../index.js';
 import { GeminiGenerationError, generateAdvancedReading, generateReadingAnalysis } from '../services/geminiService.js';
 import { notifyReaderNewSubmission, notifyRequesterReadingReady } from '../services/telegramService.js';
 import { verifyAdmin } from '../middleware/verifyAdmin.js';
+import { verifyReader } from '../middleware/verifyReader.js';
 import { verifyToken, AuthRequest } from '../middleware/verifyToken.js';
 import { GEM_COST_PER_READING, GEM_RATING_BONUS } from './gems.js';
 
@@ -112,13 +113,19 @@ router.get('/', verifyToken, async (req: AuthRequest, res: Response) => {
   }
 });
 
-// Get all submissions — admin only
-router.get('/admin/all', verifyAdmin, async (_req: AuthRequest, res: Response) => {
+// Get all submissions — admin sees all; reader sees unassigned + their own
+router.get('/admin/all', verifyReader, async (req: AuthRequest, res: Response) => {
   try {
+    const where = req.userRole === 'reader'
+      ? { OR: [{ assignedReaderId: null }, { assignedReaderId: req.userId }] }
+      : {};
+
     const submissions = await prisma.submission.findMany({
+      where,
       include: {
         reading: { include: { detectedCards: true } },
         user: { select: { id: true, email: true, name: true } },
+        assignedReader: { select: { id: true, name: true } },
         feedbacks: true,
       },
       orderBy: { createdAt: 'desc' },
@@ -131,8 +138,34 @@ router.get('/admin/all', verifyAdmin, async (_req: AuthRequest, res: Response) =
   }
 });
 
-// Detect cards from image only — admin only
-router.post('/admin/:id/detect-cards', verifyAdmin, async (req: AuthRequest, res: Response) => {
+// Assign submission to a reader — admin only
+router.put('/admin/:id/assign', verifyAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const submissionId = parseInt(req.params.id);
+    const { readerId } = req.body; // null to unassign
+
+    if (readerId !== null && readerId !== undefined) {
+      const reader = await prisma.user.findUnique({ where: { id: readerId } });
+      if (!reader || (reader.role !== 'reader' && reader.role !== 'admin')) {
+        return res.status(400).json({ error: 'Invalid reader id' });
+      }
+    }
+
+    const updated = await prisma.submission.update({
+      where: { id: submissionId },
+      data: { assignedReaderId: readerId ?? null },
+      include: { assignedReader: { select: { id: true, name: true } } },
+    });
+
+    res.json({ assignedReader: updated.assignedReader });
+  } catch (error: any) {
+    console.error('Assign submission error:', error);
+    res.status(500).json({ error: 'Failed to assign submission' });
+  }
+});
+
+// Detect cards from image only — reader or admin
+router.post('/admin/:id/detect-cards', verifyReader, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const { spreadImage } = req.body;
@@ -168,11 +201,8 @@ router.post('/admin/:id/detect-cards', verifyAdmin, async (req: AuthRequest, res
   }
 });
 
-// Generate reading preview without saving — admin only
-// Accepts either:
-//   confirmedCards: [{name, orientation}]  — pre-confirmed cards (skips vision re-detection)
-//   spreadImage + cards                    — legacy: image-based detection or manual card names
-router.post('/admin/:id/generate', verifyAdmin, async (req: AuthRequest, res: Response) => {
+// Generate reading preview without saving — reader or admin
+router.post('/admin/:id/generate', verifyReader, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const { spreadImage, image, cards = [], confirmedCards } = req.body;
@@ -213,8 +243,8 @@ router.post('/admin/:id/generate', verifyAdmin, async (req: AuthRequest, res: Re
   }
 });
 
-// Submit completed reading — admin only
-router.put('/admin/:id', verifyAdmin, async (req: AuthRequest, res: Response) => {
+// Submit completed reading — reader or admin
+router.put('/admin/:id', verifyReader, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const { astrologyReading, tarotReading, harmonisedReading, detectedCards: detectedCardObjects } = req.body;

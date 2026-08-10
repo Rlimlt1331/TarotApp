@@ -24,6 +24,7 @@ model User {
   freeReadingUsed          Boolean          @default(false)
   feedbacks                Feedback[]
   submissions              Submission[]
+  assignedReadings         Submission[]     @relation("AssignedReadings")
   gemTransactions          GemTransaction[]
   preferences              UserPreferences?
 
@@ -56,22 +57,24 @@ model GemTransaction {
 }
 
 model Submission {
-  id              Int       @id @default(autoincrement())
-  userId          Int
-  question        String
-  category        String?
-  horoscope       String?
-  gender          String?
-  country         String?
-  occupation      String?
-  additionalNotes String?
-  isFreeReading   Boolean   @default(false)
-  pendingPayment  Boolean   @default(false)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  reading         Reading?
-  feedbacks       Feedback[]
+  id               Int       @id @default(autoincrement())
+  userId           Int
+  question         String
+  category         String?
+  horoscope        String?
+  gender           String?
+  country          String?
+  occupation       String?
+  additionalNotes  String?
+  isFreeReading    Boolean   @default(false)
+  pendingPayment   Boolean   @default(false)
+  assignedReaderId Int?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignedReader   User?     @relation("AssignedReadings", fields: [assignedReaderId], references: [id])
+  reading          Reading?
+  feedbacks        Feedback[]
 
   @@map("submissions")
 }
@@ -121,6 +124,7 @@ model Feedback {
 enum UserRole {
   requester
   admin
+  reader
 }
 
 enum GemTransactionType {

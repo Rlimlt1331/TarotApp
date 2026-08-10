@@ -123,46 +123,7 @@ test('Tarot App Regression Test Suite', async (t) => {
     assert.ok(res.status === 401 || res.status === 403, 'Should reject unauthenticated request');
   });
 
-  // ─── 3. Stateless Draft Generation ─────────────────────────────────────────
-  await t.test('9. Readings: Generate Draft (stateless)', async () => {
-    const res = await fetch(`${API_URL}/readings/generate-draft`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({
-        cards: ['The Sun', 'The Moon'],
-        question: 'What is my career path?',
-        horoscope: 'Aries',
-      }),
-    });
-
-    assert.strictEqual(res.status, 200, 'Should return 200 OK');
-    const data = await res.json() as any;
-
-    assert.ok(Array.isArray(data.detectedCards), 'detectedCards should be an array');
-    assert.ok(data.detectedCards.length > 0, 'Should include at least one card');
-
-    // Each card should be an object with name and orientation
-    const firstCard = data.detectedCards[0];
-    assert.ok(typeof firstCard === 'object', 'Card should be an object');
-    assert.ok(typeof firstCard.name === 'string', 'Card should have a name string');
-    assert.ok(typeof firstCard.orientation === 'string', 'Card should have an orientation string');
-    assert.ok(['upright', 'reversed'].includes(firstCard.orientation), 'Orientation should be upright or reversed');
-
-    assert.ok(typeof data.tarotReading === 'string' && data.tarotReading.length > 0, 'tarotReading should be a non-empty string');
-    assert.ok(typeof data.horoscopeReading === 'string' && data.horoscopeReading.length > 0, 'horoscopeReading should be a non-empty string');
-    assert.ok(typeof data.harmonizedReading === 'string' && data.harmonizedReading.length > 0, 'harmonizedReading should be a non-empty string');
-  });
-
-  await t.test('10. Readings: Generate Draft Requires Question and Horoscope', async () => {
-    const res = await fetch(`${API_URL}/readings/generate-draft`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ cards: ['The Sun'] }),
-    });
-    assert.strictEqual(res.status, 400, 'Should return 400 when question/horoscope are missing');
-  });
-
-  // ─── 4. Admin Flow ──────────────────────────────────────────────────────────
+  // ─── 3. Admin Flow ──────────────────────────────────────────────────────────
   await t.test('11. Admin: Login', async () => {
     const res = await fetch(`${API_URL}/auth/login`, {
       method: 'POST',

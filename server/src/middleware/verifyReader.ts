@@ -1,0 +1,33 @@
+import { Request, Response } from 'express';
+import jwt from 'jsonwebtoken';
+import { prisma } from '../index.js';
+
+const JWT_SECRET = process.env.JWT_SECRET!;
+
+interface AuthRequest extends Request {
+  userId?: number;
+  userRole?: string;
+}
+
+// Accepts both admin and reader roles — for endpoints readers are allowed to use.
+export const verifyReader = async (req: AuthRequest, res: Response, next: Function) => {
+  try {
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    if (!token) return res.status(401).json({ error: 'No token provided' });
+
+    const decoded: any = jwt.verify(token, JWT_SECRET);
+    const user = await prisma.user.findUnique({ where: { id: decoded.userId } });
+
+    if (!user) return res.status(401).json({ error: 'User not found' });
+
+    if (user.role !== 'admin' && user.role !== 'reader') {
+      return res.status(403).json({ error: 'Reader access required' });
+    }
+
+    req.userId = user.id;
+    req.userRole = user.role;
+    next();
+  } catch {
+    res.status(401).json({ error: 'Invalid token' });
+  }
+};

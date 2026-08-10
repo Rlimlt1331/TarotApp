@@ -5,7 +5,7 @@ export interface User {
   id: number;
   email: string | null;
   name: string | null;
-  role: 'requester' | 'admin';
+  role: 'requester' | 'admin' | 'reader';
 }
 
 interface AuthContextType {
@@ -23,6 +23,7 @@ interface AuthContextType {
   logout: () => void;
   isAuthenticated: boolean;
   isAdmin: boolean;
+  isReader: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -274,6 +275,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         logout,
         isAuthenticated: !!user,
         isAdmin: user?.role === 'admin',
+        isReader: user?.role === 'reader',
       }}
     >
       {children}

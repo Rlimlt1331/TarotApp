@@ -3,11 +3,13 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
+import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Progress } from './ui/progress';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { useAuth } from '../context/AuthContext';
 import { API_URL } from '../config/api';
-import { ArrowLeft, Brain, Calendar, CheckCircle2, Gem, ImageUp, Sparkles, Star, User, X } from 'lucide-react';
+import { ArrowLeft, Brain, Calendar, CheckCircle2, Gem, ImageUp, Sparkles, Star, Trash2, User, UserPlus, Users, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -21,6 +23,14 @@ interface PendingPurchase {
   pack: { id: string; priceSGD: number; totalGems: number } | null;
   requestedAt: string;
   pendingSubmissions: number;
+}
+
+interface Reader {
+  id: number;
+  name: string | null;
+  email: string | null;
+  createdAt: string;
+  _count: { assignedReadings: number };
 }
 
 type QueueStatus = 'pending' | 'processing' | 'completed' | 'pending_payment';
@@ -53,6 +63,8 @@ interface Submission {
   occupation: string | null;
   additionalNotes: string | null;
   pendingPayment: boolean;
+  assignedReaderId: number | null;
+  assignedReader: { id: number; name: string | null } | null;
   createdAt: string;
   updatedAt: string;
   user: {
@@ -106,7 +118,10 @@ const statusLabels: Record<QueueStatus, string> = {
 };
 
 export const AdminDashboard: React.FC = () => {
-  const [view, setView] = useState<'queue' | 'gems'>('queue');
+  const { token, user } = useAuth();
+  const isAdminUser = user?.role === 'admin';
+
+  const [view, setView] = useState<'queue' | 'gems' | 'readers'>('queue');
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
@@ -127,15 +142,29 @@ export const AdminDashboard: React.FC = () => {
   const [pendingPurchases, setPendingPurchases] = useState<PendingPurchase[]>([]);
   const [gemsLoading, setGemsLoading] = useState(false);
   const [crediting, setCrediting] = useState<number | null>(null);
-  const { token } = useAuth();
+  // Readers management state (admin only)
+  const [readers, setReaders] = useState<Reader[]>([]);
+  const [readersLoading, setReadersLoading] = useState(false);
+  const [removingReader, setRemovingReader] = useState<number | null>(null);
+  const [showAddReader, setShowAddReader] = useState(false);
+  const [newReaderName, setNewReaderName] = useState('');
+  const [newReaderEmail, setNewReaderEmail] = useState('');
+  const [newReaderPassword, setNewReaderPassword] = useState('');
+  const [addingReader, setAddingReader] = useState(false);
+  // Assignment state
+  const [assigning, setAssigning] = useState<number | null>(null);
 
   useEffect(() => {
     fetchSubmissions();
-    fetchPendingPurchases();
+    if (isAdminUser) {
+      fetchPendingPurchases();
+      fetchReaders();
+    }
   }, [token]);
 
   useEffect(() => {
-    if (view === 'gems') fetchPendingPurchases();
+    if (view === 'gems' && isAdminUser) fetchPendingPurchases();
+    if (view === 'readers' && isAdminUser) fetchReaders();
   }, [view]);
 
   useEffect(() => {
@@ -213,6 +242,94 @@ export const AdminDashboard: React.FC = () => {
       toast.error(error.message || 'Failed to load submissions');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchReaders = async () => {
+    if (!token) return;
+    setReadersLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/users/admin/readers`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setReaders(data.readers);
+      }
+    } catch {
+      toast.error('Failed to load readers');
+    } finally {
+      setReadersLoading(false);
+    }
+  };
+
+  const addReader = async () => {
+    if (!token || !newReaderName.trim() || !newReaderEmail.trim() || !newReaderPassword) return;
+    setAddingReader(true);
+    try {
+      const res = await fetch(`${API_URL}/users/admin/readers`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ name: newReaderName, email: newReaderEmail, password: newReaderPassword }),
+      });
+      if (!res.ok) {
+        const d = await res.json();
+        throw new Error(d.error || 'Failed to create reader');
+      }
+      const created = await res.json();
+      setReaders((r) => [...r, { ...created, _count: { assignedReadings: 0 } }]);
+      setNewReaderName('');
+      setNewReaderEmail('');
+      setNewReaderPassword('');
+      setShowAddReader(false);
+      toast.success(`Reader account created for ${created.name}`);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to create reader');
+    } finally {
+      setAddingReader(false);
+    }
+  };
+
+  const removeReader = async (readerId: number, readerName: string | null) => {
+    if (!token) return;
+    setRemovingReader(readerId);
+    try {
+      const res = await fetch(`${API_URL}/users/admin/readers/${readerId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Failed to remove reader');
+      setReaders((r) => r.filter((x) => x.id !== readerId));
+      toast.success(`${readerName ?? 'Reader'} removed`);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to remove reader');
+    } finally {
+      setRemovingReader(null);
+    }
+  };
+
+  const assignReader = async (submissionId: number, readerId: number | null) => {
+    if (!token) return;
+    setAssigning(submissionId);
+    try {
+      const res = await fetch(`${API_URL}/submissions/admin/${submissionId}/assign`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ readerId }),
+      });
+      if (!res.ok) throw new Error('Failed to assign');
+      const { assignedReader } = await res.json();
+      setSubmissions((current) =>
+        current.map((s) =>
+          s.id === submissionId
+            ? { ...s, assignedReaderId: readerId, assignedReader: assignedReader ?? null }
+            : s
+        )
+      );
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to assign reader');
+    } finally {
+      setAssigning(null);
     }
   };
 
@@ -806,19 +923,37 @@ export const AdminDashboard: React.FC = () => {
           >
             Reading Queue
           </button>
-          <button
-            onClick={() => setView('gems')}
-            className={`flex items-center gap-2 px-5 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
-              view === 'gems'
-                ? 'border-primary text-foreground'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            Payment Verification
-            {pendingPurchases.length > 0 && (
-              <Badge className="bg-purple-600 text-white border-0 text-xs py-0 h-5">{pendingPurchases.length}</Badge>
-            )}
-          </button>
+          {isAdminUser && (
+            <button
+              onClick={() => setView('gems')}
+              className={`flex items-center gap-2 px-5 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                view === 'gems'
+                  ? 'border-primary text-foreground'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Payment Verification
+              {pendingPurchases.length > 0 && (
+                <Badge className="bg-purple-600 text-white border-0 text-xs py-0 h-5">{pendingPurchases.length}</Badge>
+              )}
+            </button>
+          )}
+          {isAdminUser && (
+            <button
+              onClick={() => setView('readers')}
+              className={`flex items-center gap-2 px-5 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                view === 'readers'
+                  ? 'border-primary text-foreground'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Users className="size-4" />
+              Readers
+              {readers.length > 0 && (
+                <Badge variant="outline" className="text-xs py-0 h-5">{readers.length}</Badge>
+              )}
+            </button>
+          )}
         </div>
       </div>
 
@@ -870,7 +1005,7 @@ export const AdminDashboard: React.FC = () => {
                       </div>
                     </CardHeader>
                     <CardContent>
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         {submission.category && (
                           <Badge variant="outline">Category: {submission.category}</Badge>
                         )}
@@ -889,6 +1024,38 @@ export const AdminDashboard: React.FC = () => {
                             Reading saved
                           </Badge>
                         )}
+                        {isAdminUser && readers.length > 0 && (
+                          <div
+                            className="ml-auto"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Select
+                              value={submission.assignedReaderId?.toString() ?? 'unassigned'}
+                              onValueChange={(val) =>
+                                assignReader(submission.id, val === 'unassigned' ? null : parseInt(val))
+                              }
+                              disabled={assigning === submission.id}
+                            >
+                              <SelectTrigger className="h-8 text-xs w-40">
+                                <SelectValue placeholder="Assign reader" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="unassigned">Unassigned</SelectItem>
+                                {readers.map((r) => (
+                                  <SelectItem key={r.id} value={r.id.toString()}>
+                                    {r.name ?? r.email}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+                        {!isAdminUser && submission.assignedReader && (
+                          <Badge variant="secondary" className="gap-1 ml-auto">
+                            <User className="size-3" />
+                            {submission.assignedReader.name ?? 'Reader'}
+                          </Badge>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
@@ -897,6 +1064,116 @@ export const AdminDashboard: React.FC = () => {
             </div>
           )}
         </>
+      )}
+
+      {/* Readers tab */}
+      {view === 'readers' && isAdminUser && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold">Reader Accounts</h2>
+              <p className="text-sm text-muted-foreground">Create logins for each of your readers.</p>
+            </div>
+            <Button onClick={() => setShowAddReader((v) => !v)} size="sm" className="gap-2">
+              <UserPlus className="size-4" />
+              Add Reader
+            </Button>
+          </div>
+
+          {showAddReader && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">New Reader Account</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div className="space-y-1">
+                    <Label>Name</Label>
+                    <Input
+                      placeholder="Reader name"
+                      value={newReaderName}
+                      onChange={(e) => setNewReaderName(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Email</Label>
+                    <Input
+                      type="email"
+                      placeholder="reader@example.com"
+                      value={newReaderEmail}
+                      onChange={(e) => setNewReaderEmail(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Password</Label>
+                    <Input
+                      type="password"
+                      placeholder="Min 8 characters"
+                      value={newReaderPassword}
+                      onChange={(e) => setNewReaderPassword(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </CardContent>
+              <CardFooter className="gap-2">
+                <Button
+                  onClick={addReader}
+                  disabled={addingReader || !newReaderName.trim() || !newReaderEmail.trim() || newReaderPassword.length < 8}
+                >
+                  {addingReader ? 'Creating…' : 'Create Reader Account'}
+                </Button>
+                <Button variant="ghost" onClick={() => setShowAddReader(false)}>Cancel</Button>
+              </CardFooter>
+            </Card>
+          )}
+
+          {readersLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary" />
+            </div>
+          ) : readers.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <Users className="size-10 text-muted-foreground mx-auto mb-3" />
+                <p className="text-muted-foreground">No readers yet</p>
+                <p className="text-xs text-muted-foreground mt-1">Add a reader account to start assigning submissions.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {readers.map((r) => (
+                <Card key={r.id}>
+                  <CardContent className="py-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <User className="size-4 text-muted-foreground" />
+                          <span className="font-medium">{r.name ?? '(no name)'}</span>
+                          {r.email && <span className="text-sm text-muted-foreground">{r.email}</span>}
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <span>{r._count.assignedReadings} assigned reading{r._count.assignedReadings !== 1 ? 's' : ''}</span>
+                          <span>·</span>
+                          <span>Added {format(new Date(r.createdAt), 'MMM dd, yyyy')}</span>
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeReader(r.id, r.name)}
+                        disabled={removingReader === r.id}
+                        className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                      >
+                        <Trash2 className="size-4 mr-1.5" />
+                        {removingReader === r.id ? 'Removing…' : 'Remove'}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
       )}
 
       {/* Payment Verification tab */}

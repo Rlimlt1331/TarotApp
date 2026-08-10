@@ -14,7 +14,7 @@ import { PrivateRoute, AdminRoute } from './components/ProtectedRoutes';
 import { Toaster } from './components/ui/sonner';
 
 function HomeRedirect() {
-  const { isAdmin, loading } = useAuth();
+  const { isAdmin, isReader, loading } = useAuth();
 
   if (loading) {
     return (
@@ -24,11 +24,11 @@ function HomeRedirect() {
     );
   }
 
-  return <Navigate to={isAdmin ? '/reader' : '/request'} replace />;
+  return <Navigate to={(isAdmin || isReader) ? '/reader' : '/request'} replace />;
 }
 
 function RequesterOnlyRoute({ children }: { children: ReactNode }) {
-  const { isAdmin, loading } = useAuth();
+  const { isAdmin, isReader, loading } = useAuth();
 
   if (loading) {
     return (
@@ -38,7 +38,7 @@ function RequesterOnlyRoute({ children }: { children: ReactNode }) {
     );
   }
 
-  if (isAdmin) {
+  if (isAdmin || isReader) {
     return <Navigate to="/reader" replace />;
   }
 

@@ -3,7 +3,7 @@ import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { useAuth } from '../context/AuthContext';
 import { format } from 'date-fns';
-import { Calendar, Sparkles, Star } from 'lucide-react';
+import { Calendar, Moon, Sparkles, Star } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { API_URL } from '../config/api';
@@ -175,12 +175,9 @@ export function MyReadings() {
                                 </Badge>
                               )}
                               {!isCompleted && !isPendingPayment && (
-                                <Badge className="bg-amber-900/30 text-amber-300 border-amber-700 flex items-center gap-1.5">
-                                  <span className="relative flex size-2">
-                                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
-                                    <span className="relative inline-flex size-2 rounded-full bg-amber-500" />
-                                  </span>
-                                  Reading in progress
+                                <Badge className="bg-indigo-900/30 text-indigo-300 border-indigo-700 flex items-center gap-1.5">
+                                  <Moon className="size-3 shrink-0" />
+                                  With your night reader
                                 </Badge>
                               )}
                             </CardDescription>
@@ -203,9 +200,22 @@ export function MyReadings() {
 
                         <div>
                           <p className="text-sm font-medium mb-2">Reading Summary:</p>
-                          <p className="text-sm text-muted-foreground line-clamp-3">
-                            {submission.reading?.harmonisedReading || 'Your reading is being prepared by the reader. Check back soon.'}
-                          </p>
+                          {isCompleted ? (
+                            <p className="text-sm text-muted-foreground line-clamp-3">
+                              {submission.reading!.harmonisedReading}
+                            </p>
+                          ) : isPendingPayment ? (
+                            <p className="text-sm text-muted-foreground">
+                              Awaiting payment confirmation before your reading is activated.
+                            </p>
+                          ) : (
+                            <div className="flex items-start gap-2 rounded-lg border border-indigo-800 bg-indigo-900/20 px-3 py-2.5">
+                              <Moon className="size-4 text-indigo-400 mt-0.5 shrink-0" />
+                              <p className="text-sm text-indigo-300">
+                                Your cards are being read tonight — check back by morning.
+                              </p>
+                            </div>
+                          )}
                         </div>
 
                         <Button

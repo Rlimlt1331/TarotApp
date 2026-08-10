@@ -29,14 +29,14 @@ const OUTCOME_CONFIG: Record<SubmissionOutcome, {
     icon: <Sparkles className="size-8 text-purple-400" />,
     iconBg: 'bg-purple-900/40',
     title: 'Reading Request Submitted!',
-    message: 'Your free reading has been submitted. Our reader will review it shortly — check My Readings for updates.',
+    message: 'Your free reading is with your night reader. Check My Readings by morning.',
     okLabel: 'Great, thank you!',
   },
   paid: {
     icon: <Gem className="size-8 text-purple-400" />,
     iconBg: 'bg-purple-900/40',
     title: 'Reading Request Submitted!',
-    message: 'Your reading has been submitted and 20 Gems have been deducted from your balance. Our reader will review it shortly — check My Readings for updates.',
+    message: 'Your reading is with your night reader and 20 Gems have been deducted. Check My Readings by morning.',
     okLabel: 'Great, thank you!',
   },
   pending_payment: {
@@ -204,10 +204,10 @@ export function RequesterPortal({ onShowAuthModal }: { onShowAuthModal: () => vo
         <div className="text-center space-y-4 py-4 md:py-8">
           <h1 className="text-3xl md:text-5xl flex items-center justify-center gap-3 gradient-text">
             <Sparkles className="size-10 sparkle text-purple-600" />
-            Request a Tarot Reading
+            Read overnight by a real person
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Connect with experienced tarot readers for guidance on your life's journey
+            Your reading is ready by morning
           </p>
           {isFreeReading && (
             <Badge className="text-lg px-6 py-2 free-badge text-white border-0">

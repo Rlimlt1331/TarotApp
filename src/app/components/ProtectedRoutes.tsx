@@ -25,7 +25,7 @@ export const PrivateRoute: React.FC<PrivateRouteProps> = ({ children }) => {
 };
 
 export const AdminRoute: React.FC<PrivateRouteProps> = ({ children }) => {
-  const { isAuthenticated, isAdmin, loading } = useAuth();
+  const { isAuthenticated, isAdmin, isReader, loading } = useAuth();
 
   if (loading) {
     return (
@@ -35,7 +35,7 @@ export const AdminRoute: React.FC<PrivateRouteProps> = ({ children }) => {
     );
   }
 
-  if (!isAuthenticated || !isAdmin) {
+  if (!isAuthenticated || (!isAdmin && !isReader)) {
     return <Navigate to="/request" replace />;
   }
 
