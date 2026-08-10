@@ -155,7 +155,7 @@ router.get('/admin/readers', verifyAdmin, async (_req: AuthRequest, res: Respons
   }
 });
 
-// Create a reader account
+// Create a reader account, or promote an existing requester to reader
 router.post('/admin/readers', verifyAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const { name, email, password } = req.body;
@@ -167,9 +167,22 @@ router.post('/admin/readers', verifyAdmin, async (req: AuthRequest, res: Respons
       return res.status(400).json({ error: 'Password must be at least 8 characters' });
     }
 
-    const existing = await prisma.user.findUnique({ where: { email } });
+    const existing = await prisma.user.findUnique({ where: { email: email.trim().toLowerCase() } });
     if (existing) {
-      return res.status(400).json({ error: 'A user with this email already exists' });
+      if (existing.role === 'admin') {
+        return res.status(400).json({ error: 'This email belongs to an admin account' });
+      }
+      if (existing.role === 'reader') {
+        return res.status(400).json({ error: 'This email is already a reader account' });
+      }
+      // Existing requester — promote to reader and update credentials
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const promoted = await prisma.user.update({
+        where: { id: existing.id },
+        data: { role: 'reader', name: name.trim(), password: hashedPassword },
+        select: { id: true, name: true, email: true, createdAt: true },
+      });
+      return res.status(200).json({ ...promoted, promoted: true });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);

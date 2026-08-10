@@ -75,16 +75,14 @@ router.post('/', verifyToken, async (req: AuthRequest, res: Response) => {
       return [sub];
     });
 
-    // Only notify the reader once payment is confirmed (not for pending-payment submissions)
-    if (!pendingPayment) {
-      notifyReaderNewSubmission({
-        id: submission.id,
-        question: submission.question,
-        category: submission.category,
-        horoscope: submission.horoscope,
-        user: { name: submission.user.name, email: submission.user.email },
-      }).catch((err) => console.error('Telegram reader alert failed:', err));
-    }
+    notifyReaderNewSubmission({
+      id: submission.id,
+      question: submission.question,
+      category: submission.category,
+      horoscope: submission.horoscope,
+      user: { name: submission.user.name, email: submission.user.email },
+      pendingPayment,
+    }).catch((err) => console.error('Telegram reader alert failed:', err));
 
     res.status(201).json(submission);
   } catch (error: any) {

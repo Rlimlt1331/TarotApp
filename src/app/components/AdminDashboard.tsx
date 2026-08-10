@@ -14,15 +14,16 @@ import { format } from 'date-fns';
 import { toast } from 'sonner';
 
 interface PendingPurchase {
-  id: number;
+  id: number | null;
   userId: number;
   userName: string | null;
   userEmail: string | null;
   packId: string | null;
   gems: number;
   pack: { id: string; priceSGD: number; totalGems: number } | null;
-  requestedAt: string;
+  requestedAt: string | null;
   pendingSubmissions: number;
+  hasPurchaseRequest: boolean;
 }
 
 interface Reader {
@@ -153,6 +154,8 @@ export const AdminDashboard: React.FC = () => {
   const [addingReader, setAddingReader] = useState(false);
   // Assignment state
   const [assigning, setAssigning] = useState<number | null>(null);
+  // Pack selection for users who haven't chosen a pack yet (userId → packId)
+  const [selectedPackForUser, setSelectedPackForUser] = useState<Record<number, string>>({});
 
   useEffect(() => {
     fetchSubmissions();
@@ -197,17 +200,19 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
-  const creditGems = async (purchase: PendingPurchase) => {
+  const creditGems = async (purchase: PendingPurchase, overridePackId?: string) => {
     if (!token) return;
-    setCrediting(purchase.id);
+    const packId = overridePackId ?? purchase.packId;
+    if (!packId) return;
+    setCrediting(purchase.userId);
     try {
       const res = await fetch(`${API_URL}/gems/admin/credit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           userId: purchase.userId,
-          packId: purchase.packId,
-          pendingId: purchase.id,
+          packId,
+          pendingId: purchase.id ?? undefined,
         }),
       });
       if (!res.ok) {
@@ -1193,44 +1198,97 @@ export const AdminDashboard: React.FC = () => {
             </Card>
           ) : (
             <div className="space-y-3">
-              {pendingPurchases.map((p) => (
-                <Card key={p.id}>
-                  <CardContent className="py-4">
-                    <div className="flex items-center justify-between gap-4 flex-wrap">
-                      <div className="space-y-0.5">
-                        <div className="flex items-center gap-2">
-                          <User className="size-4 text-muted-foreground" />
-                          <span className="font-medium">{p.userName || '(no name)'}</span>
-                          {p.userEmail && <span className="text-sm text-muted-foreground">{p.userEmail}</span>}
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
-                          <Gem className="size-3.5 text-purple-400" />
-                          <span>{p.pack ? `SGD ${p.pack.priceSGD} — ${p.gems} Gems` : `${p.gems} Gems`}</span>
-                          {p.pendingSubmissions > 0 && (
-                            <>
-                              <span>·</span>
-                              <Badge className="bg-purple-800/40 text-purple-300 border-purple-700 text-xs">
-                                {p.pendingSubmissions} reading{p.pendingSubmissions > 1 ? 's' : ''} queued
+              {pendingPurchases.map((p) => {
+                const cardKey = p.id ?? `noreq-${p.userId}`;
+                const adminPackId = selectedPackForUser[p.userId];
+                const GEM_PACKS_LIST = [
+                  { id: 'pack_10', priceSGD: 10, totalGems: 20 },
+                  { id: 'pack_20', priceSGD: 20, totalGems: 45 },
+                  { id: 'pack_50', priceSGD: 50, totalGems: 120 },
+                  { id: 'pack_80', priceSGD: 80, totalGems: 200 },
+                ];
+                return (
+                  <Card key={cardKey}>
+                    <CardContent className="py-4 space-y-3">
+                      <div className="flex items-start justify-between gap-4 flex-wrap">
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-2">
+                            <User className="size-4 text-muted-foreground" />
+                            <span className="font-medium">{p.userName || '(no name)'}</span>
+                            {p.userEmail && <span className="text-sm text-muted-foreground">{p.userEmail}</span>}
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
+                            {p.hasPurchaseRequest ? (
+                              <>
+                                <Gem className="size-3.5 text-purple-400" />
+                                <span>{p.pack ? `SGD ${p.pack.priceSGD} — ${p.gems} Gems` : `${p.gems} Gems`}</span>
+                              </>
+                            ) : (
+                              <Badge variant="outline" className="text-amber-400 border-amber-600 text-xs">
+                                No pack selected yet
                               </Badge>
-                            </>
-                          )}
-                          <span>·</span>
-                          <Calendar className="size-3.5" />
-                          <span>{format(new Date(p.requestedAt), 'MMM dd, yyyy HH:mm')}</span>
+                            )}
+                            {p.pendingSubmissions > 0 && (
+                              <>
+                                <span>·</span>
+                                <Badge className="bg-purple-800/40 text-purple-300 border-purple-700 text-xs">
+                                  {p.pendingSubmissions} reading{p.pendingSubmissions > 1 ? 's' : ''} queued
+                                </Badge>
+                              </>
+                            )}
+                            {p.requestedAt && (
+                              <>
+                                <span>·</span>
+                                <Calendar className="size-3.5" />
+                                <span>{format(new Date(p.requestedAt), 'MMM dd, yyyy HH:mm')}</span>
+                              </>
+                            )}
+                          </div>
                         </div>
+
+                        {p.hasPurchaseRequest ? (
+                          <Button
+                            onClick={() => creditGems(p)}
+                            disabled={crediting === p.userId}
+                            className="bg-purple-600 hover:bg-purple-700 text-white shrink-0"
+                          >
+                            <CheckCircle2 className="size-4 mr-2" />
+                            {crediting === p.userId ? 'Crediting…' : `Credit ${p.gems} Gems`}
+                          </Button>
+                        ) : (
+                          <div className="flex items-center gap-2 shrink-0">
+                            <Select
+                              value={adminPackId ?? ''}
+                              onValueChange={(v) =>
+                                setSelectedPackForUser((prev) => ({ ...prev, [p.userId]: v }))
+                              }
+                            >
+                              <SelectTrigger className="h-9 w-40 text-sm">
+                                <SelectValue placeholder="Select pack" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {GEM_PACKS_LIST.map((pack) => (
+                                  <SelectItem key={pack.id} value={pack.id}>
+                                    SGD {pack.priceSGD} — {pack.totalGems} Gems
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Button
+                              onClick={() => creditGems(p, adminPackId)}
+                              disabled={crediting === p.userId || !adminPackId}
+                              className="bg-purple-600 hover:bg-purple-700 text-white"
+                            >
+                              <CheckCircle2 className="size-4 mr-2" />
+                              {crediting === p.userId ? 'Crediting…' : 'Credit'}
+                            </Button>
+                          </div>
+                        )}
                       </div>
-                      <Button
-                        onClick={() => creditGems(p)}
-                        disabled={crediting === p.id}
-                        className="bg-purple-600 hover:bg-purple-700 text-white shrink-0"
-                      >
-                        <CheckCircle2 className="size-4 mr-2" />
-                        {crediting === p.id ? 'Crediting…' : `Credit ${p.gems} Gems`}
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           )}
         </>

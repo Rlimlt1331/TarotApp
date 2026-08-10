@@ -91,35 +91,66 @@ router.post('/purchase-request', verifyToken, async (req: AuthRequest, res: Resp
   }
 });
 
-// Admin: list all pending purchase requests
-router.get('/admin/pending', verifyAdmin, async (req: AuthRequest, res: Response) => {
+// Admin: list all pending payment items
+// Includes: (1) users who chose a gem pack (pending_purchase tx), and
+// (2) users whose submission is queued with pendingPayment=true but haven't picked a pack yet.
+router.get('/admin/pending', verifyAdmin, async (_req: AuthRequest, res: Response) => {
   try {
-
-    const pending = await prisma.gemTransaction.findMany({
+    // Users who have explicitly initiated a purchase request
+    const purchaseTxs = await prisma.gemTransaction.findMany({
       where: { type: 'pending_purchase' },
       include: { user: { select: { id: true, email: true, name: true } } },
       orderBy: { createdAt: 'desc' },
     });
+    const usersWithRequest = new Set(purchaseTxs.map((t) => t.userId));
 
-    // Also fetch pending-payment submission counts per user
-    const pendingSubmissionCounts = await prisma.submission.groupBy({
+    // All pending-payment submission counts per user
+    const pendingSubGroups = await prisma.submission.groupBy({
       by: ['userId'],
-      where: { userId: { in: pending.map((t) => t.userId) }, pendingPayment: true },
+      where: { pendingPayment: true },
       _count: { id: true },
     });
-    const pendingSubMap = Object.fromEntries(pendingSubmissionCounts.map((r) => [r.userId, r._count.id]));
+    const pendingSubMap = Object.fromEntries(pendingSubGroups.map((r) => [r.userId, r._count.id]));
 
-    res.json({ pending: pending.map((t) => ({
-      id: t.id,
+    // Users with queued submissions who haven't selected a pack yet — show so admin knows to chase payment
+    const noPackUserIds = pendingSubGroups
+      .map((r) => r.userId)
+      .filter((uid) => !usersWithRequest.has(uid));
+
+    const noPackUsers = noPackUserIds.length
+      ? await prisma.user.findMany({
+          where: { id: { in: noPackUserIds } },
+          select: { id: true, email: true, name: true },
+        })
+      : [];
+
+    const purchaseItems = purchaseTxs.map((t) => ({
+      id: t.id as number | null,
       userId: t.userId,
       userName: t.user.name,
       userEmail: t.user.email,
-      packId: t.referenceId,
+      packId: t.referenceId as string | null,
       gems: t.amount,
-      pack: GEM_PACKS.find((p) => p.id === t.referenceId) || null,
-      requestedAt: t.createdAt,
+      pack: GEM_PACKS.find((p) => p.id === t.referenceId) ?? null,
+      requestedAt: t.createdAt as Date | null,
       pendingSubmissions: pendingSubMap[t.userId] ?? 0,
-    })) });
+      hasPurchaseRequest: true,
+    }));
+
+    const noPackItems = noPackUsers.map((u) => ({
+      id: null as number | null,
+      userId: u.id,
+      userName: u.name,
+      userEmail: u.email,
+      packId: null as string | null,
+      gems: 0,
+      pack: null,
+      requestedAt: null as Date | null,
+      pendingSubmissions: pendingSubMap[u.id] ?? 0,
+      hasPurchaseRequest: false,
+    }));
+
+    res.json({ pending: [...purchaseItems, ...noPackItems] });
   } catch (err) {
     console.error('Pending purchases error:', err);
     res.status(500).json({ error: 'Failed to fetch pending purchases' });

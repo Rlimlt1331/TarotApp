@@ -34,20 +34,29 @@ export async function notifyReaderNewSubmission(submission: {
   category?: string | null;
   horoscope?: string | null;
   user: { name?: string | null; email: string | null };
+  pendingPayment?: boolean;
 }): Promise<void> {
   const chatId = process.env.TELEGRAM_READER_CHAT_ID;
   if (!chatId) return;
 
   const portalUrl = process.env.FRONTEND_URL || '';
+  const isPending = !!submission.pendingPayment;
+
   const lines: string[] = [
-    '🔮 <b>New Reading Request</b>',
+    isPending ? '💳 <b>New Reading — Awaiting Payment</b>' : '🔮 <b>New Reading Request</b>',
     '',
     `👤 <b>From:</b> ${submission.user.name || 'Anonymous'}${submission.user.email ? ` (${submission.user.email})` : ''}`,
   ];
   if (submission.category) lines.push(`🌟 <b>Category:</b> ${submission.category}`);
   if (submission.horoscope) lines.push(`♈ <b>Horoscope:</b> ${submission.horoscope}`);
   lines.push(`❓ <b>Question:</b> ${escapeHtml(submission.question)}`);
-  if (portalUrl) lines.push('', `📋 <a href="${portalUrl}/reader">Open Reader Portal →</a>`);
+
+  if (isPending) {
+    lines.push('', '⏳ <i>Reading queued — credit gems once payment is received.</i>');
+    if (portalUrl) lines.push(`💎 <a href="${portalUrl}/reader">Verify Payment →</a>`);
+  } else {
+    if (portalUrl) lines.push('', `📋 <a href="${portalUrl}/reader">Open Reader Portal →</a>`);
+  }
 
   await sendMessage(chatId, lines.join('\n'));
 }
