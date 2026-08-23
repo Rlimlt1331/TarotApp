@@ -2,7 +2,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { useAuth } from '../context/AuthContext';
-import { Sparkles, User, BookOpen, Eye, LogOut, LogIn, Gem } from 'lucide-react';
+import { Sparkles, User, BookOpen, Eye, LogOut, LogIn, Gem, Mail } from 'lucide-react';
 import { useState } from 'react';
 import { AuthModal } from './AuthModal';
 import { GemPurchaseModal } from './GemPurchaseModal';
@@ -99,6 +99,12 @@ export function Navigation({ onEditProfile }: { onEditProfile: () => void }) {
                           </DropdownMenuItem>
                         </>
                       )}
+                      <DropdownMenuItem asChild>
+                        <a href="mailto:tarotcafe.online@outlook.com?subject=Support%20Enquiry" className="flex items-center">
+                          <Mail className="size-4 mr-2" />
+                          Contact Support
+                        </a>
+                      </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={logout} className="text-red-600">
                         <LogOut className="size-4 mr-2" />

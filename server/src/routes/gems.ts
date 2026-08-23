@@ -2,7 +2,7 @@ import { Router, Response } from 'express';
 import { prisma } from '../index.js';
 import { verifyToken, AuthRequest } from '../middleware/verifyToken.js';
 import { verifyAdmin } from '../middleware/verifyAdmin.js';
-import { notifyReaderNewSubmission } from '../services/telegramService.js';
+import { notifyReaderNewSubmission, notifyAdminPurchaseRequest } from '../services/telegramService.js';
 
 const router = Router();
 
@@ -79,11 +79,24 @@ router.post('/purchase-request', verifyToken, async (req: AuthRequest, res: Resp
       },
     });
 
+    // Notify admin that user has selected a pack and is about to pay
+    const user = await prisma.user.findUnique({
+      where: { id: req.userId! },
+      select: { name: true, email: true },
+    });
+    notifyAdminPurchaseRequest({
+      userName: user?.name ?? null,
+      userEmail: user?.email ?? null,
+      packId,
+      priceSGD: pack.priceSGD,
+      totalGems: pack.totalGems,
+    }).catch((err) => console.error('Telegram purchase-request alert failed:', err));
+
     res.json({
       message: 'Purchase request received',
       pendingId: pendingTx.id,
       pack,
-      instructions: `Please pay SGD ${pack.priceSGD} via PayNow. Screenshot your payment and send it to the admin for gem credit.`,
+      instructions: `Please pay SGD ${pack.priceSGD} via PayNow. Add your name as shown in your app profile as the payment reference.`,
     });
   } catch (err) {
     console.error('Purchase request error:', err);

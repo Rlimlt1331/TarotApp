@@ -131,9 +131,15 @@ export function GemPurchaseModal({ open, onOpenChange }: GemPurchaseModalProps) 
               <ol className="text-sm space-y-2 text-muted-foreground list-decimal list-inside bg-muted/40 rounded-lg p-3">
                 <li>Open your bank app and scan the QR code above.</li>
                 <li>Enter amount: <strong>SGD {pack.priceSGD}</strong></li>
-                <li>Add your <strong>name</strong> in the payment reference.</li>
-                <li>Screenshot the receipt and send it to the admin via Telegram.</li>
+                <li>Use your <strong>name as shown in your app profile</strong> as the payment reference.</li>
               </ol>
+
+              <p className="text-xs text-muted-foreground">
+                For questions regarding payment, contact Tarot Cafe support at{' '}
+                <a href="mailto:tarotcafe.online@outlook.com" className="underline hover:text-foreground">
+                  tarotcafe.online@outlook.com
+                </a>
+              </p>
             </div>
 
             <p className="text-xs text-muted-foreground">

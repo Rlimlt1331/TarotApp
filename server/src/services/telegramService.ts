@@ -61,6 +61,30 @@ export async function notifyReaderNewSubmission(submission: {
   await sendMessage(chatId, lines.join('\n'));
 }
 
+export async function notifyAdminPurchaseRequest(params: {
+  userName: string | null;
+  userEmail: string | null;
+  packId: string;
+  priceSGD: number;
+  totalGems: number;
+}): Promise<void> {
+  const chatId = process.env.TELEGRAM_READER_CHAT_ID;
+  if (!chatId) return;
+
+  const portalUrl = process.env.FRONTEND_URL || '';
+  const lines: string[] = [
+    '💳 <b>Payment Pack Selected</b>',
+    '',
+    `👤 <b>From:</b> ${params.userName || 'Anonymous'}${params.userEmail ? ` (${params.userEmail})` : ''}`,
+    `💎 <b>Pack:</b> SGD ${params.priceSGD} — ${params.totalGems} Gems`,
+    '',
+    '⏳ <i>User is about to make a PayNow transfer. Verify payment and credit gems once received.</i>',
+  ];
+  if (portalUrl) lines.push(``, `💎 <a href="${portalUrl}/reader">Verify Payment →</a>`);
+
+  await sendMessage(chatId, lines.join('\n'));
+}
+
 export async function notifyRequesterReadingReady(
   chatId: string,
   question: string,
