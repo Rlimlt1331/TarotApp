@@ -27,7 +27,8 @@ const isDev = process.env.NODE_ENV !== 'production';
 const allowedOrigins = [
   // Only include localhost origins in local development
   ...(isDev ? ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'] : []),
-  'https://tarot-app-five-tawny.vercel.app',
+  'https://tarotcafe.online',
+  'https://www.tarotcafe.online',
   process.env.FRONTEND_URL,
   process.env.FRONTEND_URLS,
 ]
