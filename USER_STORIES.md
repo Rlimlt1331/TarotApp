@@ -62,9 +62,9 @@
 
 **Acceptance Criteria**
 
-- [ ] Regular users are redirected to `/request`.
-- [ ] Admin users are redirected to `/reader`.
-- [ ] Navigating to `/reader` as a non-admin redirects to `/request`.
+- [ ] Regular users (requester role) are redirected to `/request`.
+- [ ] Admin and reader users are redirected to `/reader`.
+- [ ] Navigating to `/reader` as a requester redirects to `/request`.
 - [ ] All protected routes redirect to the request page (or show the auth modal) when unauthenticated.
 
 ---
@@ -160,8 +160,12 @@
 - [ ] Each pack shows the SGD price, gem count, and a bonus description.
 - [ ] Selecting a pack advances to the PayNow payment step.
 - [ ] The PayNow step shows the correct QR code image and the SGD amount to transfer.
+- [ ] Step 3 of the payment instructions says to use the name shown in the user's app profile as the payment reference.
+- [ ] A support email note is shown below the instructions linking to tarotcafe.online@outlook.com.
 - [ ] A "Back" button returns to the pack selection step.
+- [ ] Clicking "Done — I've paid" sends a Telegram notification to the admin and closes the modal.
 - [ ] `POST /gems/purchase-request` with a valid `packId` returns HTTP 200 with a `pendingId`.
+- [ ] `POST /gems/payment-confirm` (authenticated) returns HTTP 200 after notifying the admin.
 - [ ] An invalid `packId` returns HTTP 400.
 
 ---
@@ -174,8 +178,9 @@
 
 **Acceptance Criteria**
 
-- [ ] `GET /gems/admin/pending` (admin only) returns all pending purchase transactions.
-- [ ] `POST /gems/admin/credit` with a valid `userId`, `packId`, and `pendingId` increases the user's gem balance by the pack amount and clears the pending transaction.
+- [ ] `GET /gems/admin/pending` (admin only) returns two types of entries: users with an active purchase request (`hasPurchaseRequest: true`) and users whose submission has `pendingPayment: true` but who have not yet selected a pack (`hasPurchaseRequest: false`).
+- [ ] Entries with `hasPurchaseRequest: true` include pack info; entries with `hasPurchaseRequest: false` have `pack: null` and show an "No pack selected yet" badge in the UI.
+- [ ] `POST /gems/admin/credit` with a valid `userId`, `packId`, and optional `pendingId` increases the user's gem balance by the pack amount and clears the pending transaction.
 - [ ] Non-admin access to admin endpoints returns HTTP 401 or 403.
 - [ ] After crediting, `hasPendingPurchase` is `false` in the balance response.
 
@@ -211,16 +216,38 @@
 
 ## 4. Admin — Reading Portal
 
-### US-4.1 — View All Submissions
+### US-4.0 — Multi-Reader Management
 
 **As an** admin,  
-**I want to** see all user submissions in the reader portal,  
-**so that** I can process them in order.
+**I want to** add multiple readers and assign submissions to them,  
+**so that** reading work can be distributed across a team.
 
 **Acceptance Criteria**
 
-- [ ] `GET /submissions/admin/all` returns all submissions with user info.
-- [ ] Non-admin users receive HTTP 401 or 403.
+- [ ] `GET /users/admin/readers` returns all users with the reader role.
+- [ ] `POST /users/admin/readers` with name, email, and password creates a new reader account.
+- [ ] If the email belongs to an existing requester, the account is promoted to reader (name and password updated); response includes `promoted: true`.
+- [ ] If the email belongs to an existing admin or reader, the request is rejected with HTTP 400.
+- [ ] `DELETE /users/admin/readers/:id` demotes the reader to requester and unassigns their pending (unread) submissions.
+- [ ] `PUT /submissions/admin/:id/assign` (admin only) sets or clears `assignedReaderId` on a submission.
+- [ ] Assigning a non-reader/non-admin user ID returns HTTP 400.
+- [ ] Reader users can access `GET /submissions/admin/all` and see only unassigned submissions plus their own assigned submissions.
+- [ ] Reader users cannot access admin-only endpoints (`/gems/admin/pending`, `/users/admin/readers`).
+- [ ] The Readers tab and Payment Verification tab in the admin dashboard are only visible to admin users, not reader users.
+
+---
+
+### US-4.1 — View All Submissions
+
+**As an** admin or reader,  
+**I want to** see relevant submissions in the reader portal,  
+**so that** I can process them.
+
+**Acceptance Criteria**
+
+- [ ] `GET /submissions/admin/all` returns all submissions with user info and `assignedReader` details.
+- [ ] Admin sees all submissions; reader sees only unassigned or assigned-to-them submissions.
+- [ ] Non-admin/non-reader users receive HTTP 401 or 403.
 - [ ] The admin portal at `/reader` renders `AdminDashboard` directly (no intermediary `ReaderPortal` component).
 
 ---
@@ -379,6 +406,20 @@
 - [ ] Clicking it opens Account Settings as a full-screen overlay.
 - [ ] A back arrow in the header returns the user to the main app.
 - [ ] Account Settings contains both the profile name form and the Telegram Notifications card.
+
+---
+
+### US-7.3 — Contact Support
+
+**As a** logged-in user,  
+**I want to** contact Tarot Cafe support from the navigation,  
+**so that** I can get help without leaving the app.
+
+**Acceptance Criteria**
+
+- [ ] The navigation dropdown contains a "Contact Support" item with a mail icon.
+- [ ] Clicking it opens the user's email client pre-addressed to tarotcafe.online@outlook.com with subject "Support Enquiry".
+- [ ] The item is visible to all logged-in users (requester, reader, and admin).
 
 ---
 

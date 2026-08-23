@@ -9,6 +9,7 @@ let token = '';
 let testUserId: number;
 let testSubmissionId: number;
 let adminToken = '';
+let testReaderId: number;
 
 const TEST_EMAIL = `test-${Date.now()}@example.com`;
 const TEST_PASSWORD = 'password123';
@@ -19,6 +20,9 @@ test('Tarot App Regression Test Suite', async (t) => {
   t.after(async () => {
     if (testUserId) {
       await prisma.user.delete({ where: { id: testUserId } }).catch(() => {});
+    }
+    if (testReaderId) {
+      await prisma.user.delete({ where: { id: testReaderId } }).catch(() => {});
     }
     await prisma.$disconnect();
   });
@@ -136,6 +140,64 @@ test('Tarot App Regression Test Suite', async (t) => {
     assert.ok(data.token, 'Admin should receive a token');
     assert.strictEqual(data.user.role, 'admin', 'User role should be admin');
     adminToken = data.token;
+  });
+
+  // ─── Reader management ──────────────────────────────────────────────────────
+  await t.test('11b. Admin: Create reader account', async () => {
+    const res = await fetch(`${API_URL}/users/admin/readers`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+      body: JSON.stringify({ name: 'Test Reader', email: `reader-${Date.now()}@example.com`, password: 'reader123' }),
+    });
+    assert.strictEqual(res.status, 201, 'Should create reader and return 201');
+    const data = await res.json() as any;
+    assert.ok(data.id, 'Should return reader id');
+    assert.ok(!data.promoted, 'New account should not be marked as promoted');
+    testReaderId = data.id;
+  });
+
+  await t.test('11c. Admin: Promote existing requester to reader', async () => {
+    // The test user (requester) email is promoted to reader, then we restore them after
+    const res = await fetch(`${API_URL}/users/admin/readers`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+      body: JSON.stringify({ name: 'Promoted Reader', email: TEST_EMAIL, password: 'newpass123' }),
+    });
+    assert.strictEqual(res.status, 200, 'Promoting existing requester should return 200');
+    const data = await res.json() as any;
+    assert.strictEqual(data.promoted, true, 'Response should include promoted: true');
+    // Restore to requester so later tests still work
+    await prisma.user.update({ where: { id: testUserId }, data: { role: 'requester', password: (await import('bcryptjs')).default.hashSync(TEST_PASSWORD, 10) } });
+  });
+
+  await t.test('11d. Admin: List readers', async () => {
+    const res = await fetch(`${API_URL}/users/admin/readers`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    assert.strictEqual(res.status, 200);
+    const data = await res.json() as any;
+    assert.ok(Array.isArray(data.readers), 'Should return readers array');
+    const ourReader = data.readers.find((r: any) => r.id === testReaderId);
+    assert.ok(ourReader, 'Should include the created test reader');
+  });
+
+  await t.test('11e. Admin: Non-admin cannot access reader management', async () => {
+    const res = await fetch(`${API_URL}/users/admin/readers`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    assert.ok(res.status === 401 || res.status === 403, 'Non-admin should be rejected');
+  });
+
+  await t.test('11f. Admin: Delete reader demotes to requester', async () => {
+    const res = await fetch(`${API_URL}/users/admin/readers/${testReaderId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    assert.strictEqual(res.status, 200, 'Should return 200 on delete');
+    const user = await prisma.user.findUnique({ where: { id: testReaderId } });
+    assert.strictEqual(user?.role, 'requester', 'Deleted reader should be demoted to requester');
+    // Mark cleaned up so t.after doesn't fail
+    testReaderId = 0;
   });
 
   await t.test('12. Admin: Get All Submissions', async () => {
@@ -464,7 +526,7 @@ test('Tarot App Regression Test Suite', async (t) => {
     assert.strictEqual(res.status, 400, 'Should reject invalid packId');
   });
 
-  await t.test('34. Gems: Admin can view pending purchases', async () => {
+  await t.test('34. Gems: Admin can view pending purchases with hasPurchaseRequest field', async () => {
     const res = await fetch(`${API_URL}/gems/admin/pending`, {
       headers: { Authorization: `Bearer ${adminToken}` },
     });
@@ -473,7 +535,55 @@ test('Tarot App Regression Test Suite', async (t) => {
     assert.ok(Array.isArray(data.pending), 'Should return pending array');
     const ourPending = data.pending.find((p: any) => p.userId === testUserId);
     assert.ok(ourPending, 'Should include the test user pending purchase');
-    assert.ok(ourPending.pack, 'Each pending entry should include pack info');
+    assert.ok(ourPending.pack, 'Entry with purchase request should include pack info');
+    assert.strictEqual(ourPending.hasPurchaseRequest, true, 'hasPurchaseRequest should be true for pack-selected entry');
+  });
+
+  await t.test('34b. Gems: Payment confirm notifies admin and returns 200', async () => {
+    const res = await fetch(`${API_URL}/gems/payment-confirm`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    assert.strictEqual(res.status, 200, 'payment-confirm should return 200');
+    const data = await res.json() as any;
+    assert.ok(data.message, 'Should return a message');
+  });
+
+  await t.test('34c. Gems: Payment confirm requires auth', async () => {
+    const res = await fetch(`${API_URL}/gems/payment-confirm`, { method: 'POST' });
+    assert.ok(res.status === 401 || res.status === 403, 'Should reject unauthenticated request');
+  });
+
+  await t.test('34d. Admin: Assign submission to reader', async () => {
+    // Re-create a temporary reader for assignment test
+    const createRes = await fetch(`${API_URL}/users/admin/readers`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+      body: JSON.stringify({ name: 'Assign Reader', email: `assign-reader-${Date.now()}@example.com`, password: 'reader123' }),
+    });
+    const { id: readerId } = await createRes.json() as any;
+
+    const assignRes = await fetch(`${API_URL}/submissions/admin/${testSubmissionId}/assign`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+      body: JSON.stringify({ readerId }),
+    });
+    assert.strictEqual(assignRes.status, 200, 'Should return 200 on assign');
+    const data = await assignRes.json() as any;
+    assert.strictEqual(data.assignedReader?.id, readerId, 'assignedReader id should match');
+
+    // Unassign
+    const unassignRes = await fetch(`${API_URL}/submissions/admin/${testSubmissionId}/assign`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+      body: JSON.stringify({ readerId: null }),
+    });
+    assert.strictEqual(unassignRes.status, 200);
+    const unassigned = await unassignRes.json() as any;
+    assert.strictEqual(unassigned.assignedReader, null, 'assignedReader should be null after unassign');
+
+    // Cleanup temporary reader
+    await prisma.user.delete({ where: { id: readerId } }).catch(() => {});
   });
 
   await t.test('35. Gems: Non-admin cannot view pending purchases', async () => {
