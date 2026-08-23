@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { prisma } from '../index.js';
 import { GeminiGenerationError, generateAdvancedReading, generateReadingAnalysis } from '../services/geminiService.js';
-import { notifyReaderNewSubmission, notifyRequesterReadingReady } from '../services/telegramService.js';
+import { notifyReaderNewSubmission, notifyRequesterReadingReady, notifyUserReadingCancelled } from '../services/telegramService.js';
 import { verifyAdmin } from '../middleware/verifyAdmin.js';
 import { verifyReader } from '../middleware/verifyReader.js';
 import { verifyToken, AuthRequest } from '../middleware/verifyToken.js';
@@ -159,6 +159,44 @@ router.put('/admin/:id/assign', verifyAdmin, async (req: AuthRequest, res: Respo
   } catch (error: any) {
     console.error('Assign submission error:', error);
     res.status(500).json({ error: 'Failed to assign submission' });
+  }
+});
+
+// Cancel a queued pending-payment submission — admin only
+router.post('/admin/:id/cancel', verifyAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const submissionId = parseInt(req.params.id);
+
+    const submission = await prisma.submission.findUnique({
+      where: { id: submissionId },
+      include: {
+        reading: true,
+        user: { select: { telegramChatId: true } },
+      },
+    });
+
+    if (!submission) {
+      return res.status(404).json({ error: 'Submission not found' });
+    }
+    if (!submission.pendingPayment) {
+      return res.status(400).json({ error: 'Only pending-payment submissions can be cancelled' });
+    }
+    if (submission.reading) {
+      return res.status(400).json({ error: 'Cannot cancel a submission that already has a reading' });
+    }
+
+    await prisma.submission.delete({ where: { id: submissionId } });
+
+    // Notify the user via Telegram if linked
+    if (submission.user?.telegramChatId) {
+      notifyUserReadingCancelled(submission.user.telegramChatId, submission.question)
+        .catch((err) => console.error('Telegram reading-cancelled notification failed:', err));
+    }
+
+    res.json({ message: 'Reading cancelled' });
+  } catch (error: any) {
+    console.error('Cancel submission error:', error);
+    res.status(500).json({ error: 'Failed to cancel submission' });
   }
 });
 

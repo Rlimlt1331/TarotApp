@@ -30,6 +30,7 @@ function txLabel(type: string): string {
   switch (type) {
     case 'purchase': return 'Gems purchased';
     case 'pending_purchase': return 'Pending payment verification';
+    case 'payment_rejected': return 'Payment not verified';
     case 'free_reading': return 'Free reading used';
     case 'reading_spend': return 'Reading submitted';
     case 'rating_bonus': return 'Rating bonus';

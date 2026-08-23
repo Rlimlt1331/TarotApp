@@ -85,6 +85,28 @@ export async function notifyAdminPurchaseRequest(params: {
   await sendMessage(chatId, lines.join('\n'));
 }
 
+export async function notifyUserPaymentRejected(chatId: string): Promise<void> {
+  const lines = [
+    '⚠️ <b>Payment Not Verified</b>',
+    '',
+    'We were unable to verify your recent PayNow payment.',
+    '',
+    'Please check that the transfer was completed and try again. If you believe this is a mistake, contact us at <a href="mailto:tarotcafe.online@outlook.com">tarotcafe.online@outlook.com</a>.',
+  ];
+  await sendMessage(chatId, lines.join('\n'));
+}
+
+export async function notifyUserReadingCancelled(chatId: string, question: string): Promise<void> {
+  const lines = [
+    '❌ <b>Reading Request Cancelled</b>',
+    '',
+    `Your reading request — <i>"${escapeHtml(question)}"</i> — has been cancelled as payment could not be confirmed.`,
+    '',
+    'You are welcome to submit a new request once payment has been arranged. If you need help, contact us at <a href="mailto:tarotcafe.online@outlook.com">tarotcafe.online@outlook.com</a>.',
+  ];
+  await sendMessage(chatId, lines.join('\n'));
+}
+
 export async function notifyRequesterReadingReady(
   chatId: string,
   question: string,

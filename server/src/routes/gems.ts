@@ -2,7 +2,7 @@ import { Router, Response } from 'express';
 import { prisma } from '../index.js';
 import { verifyToken, AuthRequest } from '../middleware/verifyToken.js';
 import { verifyAdmin } from '../middleware/verifyAdmin.js';
-import { notifyReaderNewSubmission, notifyAdminPurchaseRequest } from '../services/telegramService.js';
+import { notifyReaderNewSubmission, notifyAdminPurchaseRequest, notifyUserPaymentRejected } from '../services/telegramService.js';
 
 const router = Router();
 
@@ -128,6 +128,48 @@ router.post('/payment-confirm', verifyToken, async (req: AuthRequest, res: Respo
   }
 });
 
+// Admin: reject a pending payment — deletes the pending_purchase transaction,
+// writes an audit record, and notifies the user via Telegram if linked.
+router.post('/admin/reject', verifyAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const { userId, pendingId } = req.body;
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+
+    // Remove the pending purchase transaction
+    if (pendingId) {
+      await prisma.gemTransaction.deleteMany({
+        where: { id: pendingId, userId, type: 'pending_purchase' },
+      });
+    } else {
+      await prisma.gemTransaction.deleteMany({
+        where: { userId, type: 'pending_purchase' },
+      });
+    }
+
+    // Write an audit record so the user can see the rejection in their gem history
+    await prisma.gemTransaction.create({
+      data: { userId, type: 'payment_rejected', amount: 0 },
+    });
+
+    // Notify the user via Telegram if they have linked their account
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { telegramChatId: true },
+    });
+    if (user?.telegramChatId) {
+      notifyUserPaymentRejected(user.telegramChatId)
+        .catch((err) => console.error('Telegram payment-rejected notification failed:', err));
+    }
+
+    res.json({ message: 'Payment request rejected' });
+  } catch (err) {
+    console.error('Reject payment error:', err);
+    res.status(500).json({ error: 'Failed to reject payment' });
+  }
+});
+
 // Admin: list all pending payment items
 // Includes: (1) users who chose a gem pack (pending_purchase tx), and
 // (2) users whose submission is queued with pendingPayment=true but haven't picked a pack yet.
@@ -141,17 +183,20 @@ router.get('/admin/pending', verifyAdmin, async (_req: AuthRequest, res: Respons
     });
     const usersWithRequest = new Set(purchaseTxs.map((t) => t.userId));
 
-    // All pending-payment submission counts per user
-    const pendingSubGroups = await prisma.submission.groupBy({
-      by: ['userId'],
+    // All pending-payment submissions with IDs (at most 1 per user due to 409 guard)
+    const pendingSubRows = await prisma.submission.findMany({
       where: { pendingPayment: true },
-      _count: { id: true },
+      select: { id: true, userId: true },
     });
-    const pendingSubMap = Object.fromEntries(pendingSubGroups.map((r) => [r.userId, r._count.id]));
+    const pendingSubMap: Record<number, { count: number; ids: number[] }> = {};
+    for (const sub of pendingSubRows) {
+      if (!pendingSubMap[sub.userId]) pendingSubMap[sub.userId] = { count: 0, ids: [] };
+      pendingSubMap[sub.userId].count++;
+      pendingSubMap[sub.userId].ids.push(sub.id);
+    }
 
     // Users with queued submissions who haven't selected a pack yet — show so admin knows to chase payment
-    const noPackUserIds = pendingSubGroups
-      .map((r) => r.userId)
+    const noPackUserIds = [...new Set(pendingSubRows.map((s) => s.userId))]
       .filter((uid) => !usersWithRequest.has(uid));
 
     const noPackUsers = noPackUserIds.length
@@ -170,7 +215,8 @@ router.get('/admin/pending', verifyAdmin, async (_req: AuthRequest, res: Respons
       gems: t.amount,
       pack: GEM_PACKS.find((p) => p.id === t.referenceId) ?? null,
       requestedAt: t.createdAt as Date | null,
-      pendingSubmissions: pendingSubMap[t.userId] ?? 0,
+      pendingSubmissions: pendingSubMap[t.userId]?.count ?? 0,
+      pendingSubmissionIds: pendingSubMap[t.userId]?.ids ?? [],
       hasPurchaseRequest: true,
     }));
 
@@ -183,7 +229,8 @@ router.get('/admin/pending', verifyAdmin, async (_req: AuthRequest, res: Respons
       gems: 0,
       pack: null,
       requestedAt: null as Date | null,
-      pendingSubmissions: pendingSubMap[u.id] ?? 0,
+      pendingSubmissions: pendingSubMap[u.id]?.count ?? 0,
+      pendingSubmissionIds: pendingSubMap[u.id]?.ids ?? [],
       hasPurchaseRequest: false,
     }));
 

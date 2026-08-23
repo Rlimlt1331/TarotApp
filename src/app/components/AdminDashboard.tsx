@@ -9,7 +9,7 @@ import { Progress } from './ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { useAuth } from '../context/AuthContext';
 import { API_URL } from '../config/api';
-import { ArrowLeft, Brain, Calendar, CheckCircle2, Gem, ImageUp, Sparkles, Star, Trash2, User, UserPlus, Users, X } from 'lucide-react';
+import { ArrowLeft, Brain, Calendar, CheckCircle2, Gem, ImageUp, Sparkles, Star, Trash2, User, UserPlus, Users, X, XCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -23,6 +23,7 @@ interface PendingPurchase {
   pack: { id: string; priceSGD: number; totalGems: number } | null;
   requestedAt: string | null;
   pendingSubmissions: number;
+  pendingSubmissionIds: number[];
   hasPurchaseRequest: boolean;
 }
 
@@ -143,6 +144,8 @@ export const AdminDashboard: React.FC = () => {
   const [pendingPurchases, setPendingPurchases] = useState<PendingPurchase[]>([]);
   const [gemsLoading, setGemsLoading] = useState(false);
   const [crediting, setCrediting] = useState<number | null>(null);
+  const [rejecting, setRejecting] = useState<number | null>(null);
+  const [cancelling, setCancelling] = useState<number | null>(null);
   // Readers management state (admin only)
   const [readers, setReaders] = useState<Reader[]>([]);
   const [readersLoading, setReadersLoading] = useState(false);
@@ -226,6 +229,53 @@ export const AdminDashboard: React.FC = () => {
       toast.error(err.message || 'Failed to credit gems');
     } finally {
       setCrediting(null);
+    }
+  };
+
+  const rejectPayment = async (purchase: PendingPurchase) => {
+    if (!token) return;
+    const name = purchase.userName || purchase.userEmail || 'this user';
+    if (!window.confirm(`Reject the pending payment from ${name}? This will remove their purchase request — their queued reading will remain until payment is received.`)) return;
+    setRejecting(purchase.userId);
+    try {
+      const res = await fetch(`${API_URL}/gems/admin/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ userId: purchase.userId, pendingId: purchase.id ?? undefined }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to reject payment');
+      }
+      toast.success(`Payment request from ${name} rejected`);
+      await fetchPendingPurchases();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to reject payment');
+    } finally {
+      setRejecting(null);
+    }
+  };
+
+  const cancelReading = async (submissionId: number, purchase: PendingPurchase) => {
+    if (!token) return;
+    const name = purchase.userName || purchase.userEmail || 'this user';
+    if (!window.confirm(`Cancel the queued reading for ${name}? This cannot be undone. The user will be notified via Telegram if linked.`)) return;
+    setCancelling(submissionId);
+    try {
+      const res = await fetch(`${API_URL}/submissions/admin/${submissionId}/cancel`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to cancel reading');
+      }
+      toast.success(`Reading cancelled for ${name}`);
+      await Promise.all([fetchPendingPurchases(), fetchSubmissions()]);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to cancel reading');
+    } finally {
+      setCancelling(null);
     }
   };
 
@@ -1247,14 +1297,25 @@ export const AdminDashboard: React.FC = () => {
                         </div>
 
                         {p.hasPurchaseRequest ? (
-                          <Button
-                            onClick={() => creditGems(p)}
-                            disabled={crediting === p.userId}
-                            className="bg-purple-600 hover:bg-purple-700 text-white shrink-0"
-                          >
-                            <CheckCircle2 className="size-4 mr-2" />
-                            {crediting === p.userId ? 'Crediting…' : `Credit ${p.gems} Gems`}
-                          </Button>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <Button
+                              onClick={() => creditGems(p)}
+                              disabled={crediting === p.userId || rejecting === p.userId}
+                              className="bg-purple-600 hover:bg-purple-700 text-white"
+                            >
+                              <CheckCircle2 className="size-4 mr-2" />
+                              {crediting === p.userId ? 'Crediting…' : `Credit ${p.gems} Gems`}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              onClick={() => rejectPayment(p)}
+                              disabled={crediting === p.userId || rejecting === p.userId}
+                              className="border-red-800 text-red-400 hover:bg-red-900/30 hover:text-red-300"
+                            >
+                              <XCircle className="size-4 mr-2" />
+                              {rejecting === p.userId ? 'Rejecting…' : 'Reject'}
+                            </Button>
+                          </div>
                         ) : (
                           <div className="flex items-center gap-2 shrink-0">
                             <Select
@@ -1285,6 +1346,24 @@ export const AdminDashboard: React.FC = () => {
                           </div>
                         )}
                       </div>
+
+                      {p.pendingSubmissionIds.length > 0 && (
+                        <div className="flex flex-wrap gap-2 pt-1 border-t border-border/50">
+                          {p.pendingSubmissionIds.map((subId) => (
+                            <Button
+                              key={subId}
+                              variant="outline"
+                              size="sm"
+                              onClick={() => cancelReading(subId, p)}
+                              disabled={cancelling === subId}
+                              className="border-red-900 text-red-400 hover:bg-red-900/30 hover:text-red-300 text-xs h-7"
+                            >
+                              <X className="size-3 mr-1.5" />
+                              {cancelling === subId ? 'Cancelling…' : `Cancel Reading #${subId}`}
+                            </Button>
+                          ))}
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 );
