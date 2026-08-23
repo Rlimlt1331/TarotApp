@@ -77,11 +77,15 @@ export function GemPurchaseModal({ open, onOpenChange }: GemPurchaseModalProps) 
                 <AlertCircle className="size-4 shrink-0 mt-0.5 text-amber-400" />
                 <span>
                   You have a pending payment{pendingPurchaseSGD != null ? ` of SGD ${pendingPurchaseSGD}` : ''} awaiting
-                  admin verification. Selecting a new pack will update the existing payment verification
-                  request — the admin will credit based on your latest selection.
+                  verification. Selecting a new pack will update your request — gems will be credited based on your latest selection.
                 </span>
               </div>
             )}
+
+            <div className="rounded-lg border border-purple-800/50 bg-purple-950/30 px-4 py-3 text-sm text-purple-200/80 leading-relaxed">
+              🌙 Tarot Cafe is a passion project run in spare time. Every reading is crafted by a real reader with the help of AI — and that AI comes with a small running cost. Gems cover exactly that, nothing more. Thank you for being part of this.
+            </div>
+
             <p className="text-sm text-muted-foreground">Each reading costs <strong>20 Gems</strong>. Choose a pack:</p>
             <div className="grid grid-cols-2 gap-3">
               {PACKS.map((p) => (
@@ -107,10 +111,10 @@ export function GemPurchaseModal({ open, onOpenChange }: GemPurchaseModalProps) 
               ))}
             </div>
             <p className="text-xs text-muted-foreground text-center">
-              Admin will verify payment received within 24 hours of your PayNow transfer.
+              Payment is verified within 24 hours of your PayNow transfer — usually sooner.
             </p>
             <p className="text-xs text-muted-foreground text-center">
-              No refunds once gems have been used. Unused gems are non-refundable after purchase.
+              Gems are non-refundable once used. Unused gems cannot be refunded after purchase.
             </p>
           </div>
         )}
@@ -149,8 +153,8 @@ export function GemPurchaseModal({ open, onOpenChange }: GemPurchaseModalProps) 
             </div>
 
             <p className="text-xs text-muted-foreground">
-              Gems will be credited to your account within 24 hours after payment is verified.
-              No refunds once gems have been used.
+              Gems will be credited within 24 hours of payment verification — usually sooner.
+              Gems are non-refundable once used.
             </p>
 
             <div className="flex gap-2">
