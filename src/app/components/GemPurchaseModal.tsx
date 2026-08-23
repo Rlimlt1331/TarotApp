@@ -40,6 +40,12 @@ export function GemPurchaseModal({ open, onOpenChange }: GemPurchaseModalProps) 
   };
 
   const handleDone = async () => {
+    if (token) {
+      fetch(`${API_URL}/gems/payment-confirm`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      }).catch(() => {});
+    }
     await refreshGems();
     toast.info('Once your payment is verified, gems will be credited to your account.');
     onOpenChange(false);

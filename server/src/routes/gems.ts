@@ -79,19 +79,6 @@ router.post('/purchase-request', verifyToken, async (req: AuthRequest, res: Resp
       },
     });
 
-    // Notify admin that user has selected a pack and is about to pay
-    const user = await prisma.user.findUnique({
-      where: { id: req.userId! },
-      select: { name: true, email: true },
-    });
-    notifyAdminPurchaseRequest({
-      userName: user?.name ?? null,
-      userEmail: user?.email ?? null,
-      packId,
-      priceSGD: pack.priceSGD,
-      totalGems: pack.totalGems,
-    }).catch((err) => console.error('Telegram purchase-request alert failed:', err));
-
     res.json({
       message: 'Purchase request received',
       pendingId: pendingTx.id,
@@ -101,6 +88,43 @@ router.post('/purchase-request', verifyToken, async (req: AuthRequest, res: Resp
   } catch (err) {
     console.error('Purchase request error:', err);
     res.status(500).json({ error: 'Failed to process purchase request' });
+  }
+});
+
+// User confirms they have paid — triggers admin Telegram alert
+router.post('/payment-confirm', verifyToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.userId! },
+      select: { name: true, email: true },
+    });
+
+    const pendingTx = await prisma.gemTransaction.findFirst({
+      where: { userId: req.userId!, type: 'pending_purchase' },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!pendingTx) {
+      return res.status(400).json({ error: 'No pending purchase found' });
+    }
+
+    const pack = GEM_PACKS.find((p) => p.id === pendingTx.referenceId);
+    if (!pack) {
+      return res.status(400).json({ error: 'Pack not found' });
+    }
+
+    notifyAdminPurchaseRequest({
+      userName: user?.name ?? null,
+      userEmail: user?.email ?? null,
+      packId: pack.id,
+      priceSGD: pack.priceSGD,
+      totalGems: pack.totalGems,
+    }).catch((err) => console.error('Telegram payment-confirm alert failed:', err));
+
+    res.json({ message: 'Admin notified' });
+  } catch (err) {
+    console.error('Payment confirm error:', err);
+    res.status(500).json({ error: 'Failed to notify admin' });
   }
 });
 
