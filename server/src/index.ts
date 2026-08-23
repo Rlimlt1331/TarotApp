@@ -56,12 +56,13 @@ app.use(cors({
 }));
 
 // Rate limiting — auth endpoints are the highest-value attack surface
-const authLimiter = rateLimit({
+// Strict limiter for credential submission only (login + signup)
+const credentialLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5,                    // 5 attempts per window per IP
+  max: 20,                   // 20 attempts per window per IP
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Too many requests, please try again later.' },
+  message: { error: 'Too many login attempts, please try again later.' },
 });
 
 // General API limiter — prevents bulk scraping / DoS
@@ -73,7 +74,10 @@ const apiLimiter = rateLimit({
   message: { error: 'Too many requests, please try again later.' },
 });
 
-app.use('/api/auth', authLimiter);
+// Apply strict limit to credential endpoints only — /auth/verify is excluded
+// so page-load token checks don't burn through the budget
+app.use('/api/auth/login', credentialLimiter);
+app.use('/api/auth/signup', credentialLimiter);
 app.use('/api', apiLimiter);
 
 app.use(express.json({ limit: '10mb' }));
