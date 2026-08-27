@@ -231,6 +231,34 @@ async function apiGemsPurchaseRequest(token) {
   return d.pendingId;
 }
 
+async function apiPaymentConfirmRequiresAuth() {
+  // Unauthenticated → 401/403
+  const r = await fetch(`${API}/gems/payment-confirm`, { method: 'POST' });
+  assert.ok(r.status === 401 || r.status === 403, `Expected 401/403, got ${r.status}`);
+  step('🔍', 'API POST /gems/payment-confirm unauthenticated → 401/403', `status=${r.status}`);
+}
+
+async function apiAdminRejectRequiresAdmin(token) {
+  // Regular user token → 401/403
+  const r = await fetch(`${API}/gems/admin/reject`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ userId: 999 }),
+  });
+  assert.ok(r.status === 401 || r.status === 403, `Expected 401/403, got ${r.status}`);
+  step('🔍', 'API POST /gems/admin/reject non-admin → 401/403', `status=${r.status}`);
+}
+
+async function apiAdminCancelSubmissionRequiresAdmin(token) {
+  // Regular user token → 401/403
+  const r = await fetch(`${API}/submissions/admin/999/cancel`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  assert.ok(r.status === 401 || r.status === 403, `Expected 401/403, got ${r.status}`);
+  step('🔍', 'API POST /submissions/admin/:id/cancel non-admin → 401/403', `status=${r.status}`);
+}
+
 async function apiProfileUpdate(token) {
   const r = await fetch(`${API}/users/profile`, {
     method: 'PUT',
@@ -421,6 +449,31 @@ async function uiGemPurchasePayNowQR() {
   await screenshot('10_gem_paynow');
 }
 
+async function uiGemsModalHobbyNote() {
+  // Gems modal should show the passion-project/cost explanation note
+  const note = page.locator('text=passion project').first();
+  assert.ok(await note.isVisible(), 'Hobby/cost note not visible in Gems modal');
+  step('✅', 'Gems modal — passion project note visible on pack selection screen');
+}
+
+async function uiGemsModalPayNowCopy() {
+  // Advance to the PayNow step to check updated instructions
+  const pack10 = page.locator('button').filter({ hasText: '$10 SGD' }).first();
+  await pack10.click();
+  await page.waitForSelector('img[alt="PayNow QR code"]', { timeout: 6000 });
+
+  // Step 3 should mention "app profile", not just "name"
+  const profileRef = page.locator('text=app profile').first();
+  assert.ok(await profileRef.isVisible(), 'PayNow step 3 should reference "app profile"');
+
+  // Support email should be present
+  const supportLink = page.locator(`a[href*="tarotcafe.online@outlook.com"]`).first();
+  assert.ok(await supportLink.isVisible(), 'Support email link not visible in PayNow step');
+
+  step('✅', 'Gems PayNow step — "app profile" instruction + support email link visible');
+  await screenshot('10b_paynow_copy');
+}
+
 async function uiGemModalClose() {
   const backBtn = page.getByRole('button', { name: /back/i });
   await backBtn.click();
@@ -530,6 +583,22 @@ async function uiUserProfileBackArrow() {
   await screenshot('17_back_from_settings');
 }
 
+async function uiContactSupportInNavDropdown() {
+  await page.goto(`${BASE}/request`, { waitUntil: 'networkidle' });
+  const dropdownTrigger = page.locator('button').filter({ hasText: /@test\.local|UI Test User|Account/i }).first();
+  await dropdownTrigger.click();
+
+  const contactItem = page.locator('a').filter({ hasText: /contact support/i }).first();
+  assert.ok(await contactItem.isVisible(), '"Contact Support" item not visible in nav dropdown');
+
+  const href = await contactItem.getAttribute('href');
+  assert.ok(href?.includes('tarotcafe.online@outlook.com'), `Contact Support href missing support email: ${href}`);
+
+  step('✅', 'Nav dropdown — Contact Support item visible with correct mailto href');
+  await screenshot('18b_contact_support_menu');
+  await page.keyboard.press('Escape');
+}
+
 async function uiUserProfileTelegramCard() {
   // Re-open Account Settings to verify TelegramSettings card is present
   await page.goto(`${BASE}/request`, { waitUntil: 'networkidle' });
@@ -573,6 +642,9 @@ async function run() {
     ['API: telegram status endpoint',       async () => { await apiTelegramStatus(global.testToken); }],
     ['API: telegram preferences upsert',   async () => { await apiTelegramPreferences(global.testToken); }],
     ['API: gems purchase-request',         async () => { global.testPendingId = await apiGemsPurchaseRequest(global.testToken); }],
+    ['API: payment-confirm requires auth', apiPaymentConfirmRequiresAuth],
+    ['API: admin/reject requires admin',   async () => { await apiAdminRejectRequiresAdmin(global.testToken); }],
+    ['API: admin/cancel requires admin',   async () => { await apiAdminCancelSubmissionRequiresAdmin(global.testToken); }],
     ['API: profile name update',           async () => { await apiProfileUpdate(global.testToken); }],
     // UI
     ['UI: homepage loads',                  uiHomepageLoads],
@@ -587,7 +659,9 @@ async function run() {
     ['UI: email signup',                    uiEmailSignupAndLogin],
     ['UI: gem balance in nav',              uiGemBalanceInNav],
     ['UI: gem purchase modal (packs)',      uiGemPurchaseModal],
+    ['UI: Gems modal hobby note',           uiGemsModalHobbyNote],
     ['UI: PayNow QR in pay step',           uiGemPurchasePayNowQR],
+    ['UI: PayNow copy — profile name ref', uiGemsModalPayNowCopy],
     ['UI: gem modal close/back',            uiGemModalClose],
     ['UI: free reading badge',              uiRequesterPortalFreeReadingBadge],
     ['UI: submit form ready state',         uiSubmitFreeReadingForm],
@@ -596,6 +670,7 @@ async function run() {
     ['UI: Gem History page at /gem-history',uiGemHistoryPage],
     ['UI: Account Settings opens',          uiUserProfileAccountSettings],
     ['UI: Account Settings back arrow',     uiUserProfileBackArrow],
+    ['UI: Contact Support in nav dropdown', uiContactSupportInNavDropdown],
     ['UI: Account Settings Telegram card',  uiUserProfileTelegramCard],
   ];
 

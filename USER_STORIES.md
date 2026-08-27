@@ -155,6 +155,7 @@
 
 **Acceptance Criteria**
 
+- [ ] The gem purchase modal displays a note explaining that Tarot Cafe is a passion project and gems cover AI running costs only.
 - [ ] The gem purchase modal displays exactly 4 packs.
 - [ ] One pack is marked "Most Popular".
 - [ ] Each pack shows the SGD price, gem count, and a bonus description.
@@ -179,10 +180,46 @@
 **Acceptance Criteria**
 
 - [ ] `GET /gems/admin/pending` (admin only) returns two types of entries: users with an active purchase request (`hasPurchaseRequest: true`) and users whose submission has `pendingPayment: true` but who have not yet selected a pack (`hasPurchaseRequest: false`).
-- [ ] Entries with `hasPurchaseRequest: true` include pack info; entries with `hasPurchaseRequest: false` have `pack: null` and show an "No pack selected yet" badge in the UI.
+- [ ] Each entry includes `pendingSubmissionIds: number[]` so admin can cancel individual queued readings.
+- [ ] Entries with `hasPurchaseRequest: true` include pack info; entries with `hasPurchaseRequest: false` have `pack: null` and show a "No pack selected yet" badge in the UI.
 - [ ] `POST /gems/admin/credit` with a valid `userId`, `packId`, and optional `pendingId` increases the user's gem balance by the pack amount and clears the pending transaction.
 - [ ] Non-admin access to admin endpoints returns HTTP 401 or 403.
 - [ ] After crediting, `hasPendingPurchase` is `false` in the balance response.
+
+---
+
+### US-3.3b — Admin Rejects Payment
+
+**As an** admin,  
+**I want to** reject a pending payment that cannot be verified,  
+**so that** the record is cleared and the user is notified to try again.
+
+**Acceptance Criteria**
+
+- [ ] `POST /gems/admin/reject` with `userId` (and optional `pendingId`) deletes the `pending_purchase` gem transaction.
+- [ ] A `payment_rejected` gem transaction (amount: 0) is written as an audit record; it appears in the user's Gem History as "Payment not verified".
+- [ ] If the user has a Telegram account linked, a notification is sent: *"⚠️ Payment Not Verified — We were unable to verify your PayNow payment. Please try again or contact tarotcafe.online@outlook.com."*
+- [ ] The user's queued `pendingPayment: true` submission is **not** deleted — it remains so the user can pay again and have it activated.
+- [ ] After rejection, the item moves from "has pack selected" to "No pack selected yet" in the Payment Verification tab.
+- [ ] Non-admin access returns HTTP 401 or 403.
+
+---
+
+### US-3.3c — Admin Cancels Queued Reading
+
+**As an** admin,  
+**I want to** cancel a queued pending-payment reading,  
+**so that** the submission queue is kept clean when a reading will not be fulfilled.
+
+**Acceptance Criteria**
+
+- [ ] `POST /submissions/admin/:id/cancel` deletes the submission if it has `pendingPayment: true` and no reading attached.
+- [ ] Attempting to cancel a submission without `pendingPayment: true` returns HTTP 400.
+- [ ] Attempting to cancel a submission that already has a reading returns HTTP 400.
+- [ ] If the user has a Telegram account linked, a notification is sent: *"❌ Reading Request Cancelled — your reading has been cancelled as payment could not be confirmed."*
+- [ ] After cancellation, the submission disappears from the Payment Verification tab (once no pending submissions remain for that user).
+- [ ] The user's gem balance is unaffected (no gems were deducted for pending-payment submissions).
+- [ ] Non-admin access returns HTTP 401 or 403.
 
 ---
 
@@ -446,8 +483,9 @@
 
 **Acceptance Criteria**
 
-- [ ] The `/api/auth` endpoint group is rate-limited to 5 requests per 15-minute window per IP.
-- [ ] Exceeding the limit returns HTTP 429 with a human-readable error message.
+- [ ] `POST /api/auth/login` and `POST /api/auth/signup` are rate-limited to 20 requests per 15-minute window per IP.
+- [ ] `GET /api/auth/verify` is **not** subject to the strict auth limiter — it falls through to the general 120 req/min limiter so page-load token checks are not blocked.
+- [ ] Exceeding the login/signup limit returns HTTP 429 with a human-readable error message.
 
 ---
 
